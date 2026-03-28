@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Marcas de Agua - PS Tecales</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .preview-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+        .canvas-wrapper {
+            position: relative;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6">
+        <header class="border-b pb-4 mb-6">
+            <h1 class="text-2xl font-bold text-gray-800">Marcador de Fotos de Proyecto</h1>
+            <p class="text-gray-500">Carga tus fotos y aplica la marca de agua personalizada.</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Panel de Configuración -->
+            <div class="space-y-6">
+                <section class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                    <h2 class="font-semibold text-blue-800 mb-3 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                        Datos de la Marca
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Proyecto</label>
+                            <input type="text" id="proyectoInput" value="PS Tecales" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" oninput="updateAllCanvas()">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Fecha</label>
+                            <input type="date" id="fechaInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" oninput="updateAllCanvas()">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Título / Descripción</label>
+                            <select id="tituloSelect" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" onchange="updateAllCanvas()">
+                                <option value="Prensa terminales">Prensa terminales (Default)</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="bg-green-50 p-4 rounded-lg border border-green-100">
+                    <h2 class="font-semibold text-green-800 mb-3 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        Fuentes de Títulos
+                    </h2>
+                    
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Cargar TXT (Electromecánicos)</label>
+                            <input type="file" accept=".txt" class="text-sm" onchange="loadTitlesFromFile(this, 'EM')" onload="loadTitlesFromFile(this, 'EM')">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Cargar TXT (Civiles)</label>
+                            <input type="file" accept=".txt" class="text-sm" onchange="loadTitlesFromFile(this, 'Civil')">
+                        </div>
+                        <div class="pt-2 border-t">
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Añadir Manualmente</label>
+                            <div class="flex gap-1 mt-1">
+                                <input type="text" id="manualTitle" placeholder="Nuevo título..." class="text-sm border p-1 rounded w-full">
+                                <button onclick="addManualTitle()" class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">Añadir</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="pt-4">
+                    <label class="flex flex-col items-center px-4 py-6 bg-white text-blue rounded-lg shadow-lg tracking-wide uppercase border border-blue cursor-pointer hover:bg-blue-500 hover:text-white transition-all">
+                        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path d="M16.88 9.1L13.47 5.7C12.7 4.93 11.41 4.93 10.64 5.7L6.23 10.1C5.85 10.48 5.65 11 5.65 11.54V13.5C5.65 14.33 6.32 15 7.15 15H9.11C9.65 15 10.17 14.8 10.55 14.42L14.96 10.02C15.73 9.25 15.73 7.96 14.96 7.19L16.88 9.1ZM12.12 7.12L14.07 9.07L13.12 10.02L11.17 8.07L12.12 7.12ZM7.65 13.5V12.04L9.61 14H7.15C7.15 13.5 7.65 13.5 7.65 13.5Z"></path></svg>
+                        <span class="mt-2 text-base leading-normal">Seleccionar Imágenes</span>
+                        <input type="file" id="imageInput" multiple accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                    </label>
+                </div>
+
+                <button id="downloadBtn" onclick="downloadAll()" class="w-full bg-gray-800 text-white font-bold py-3 rounded-lg opacity-50 cursor-not-allowed" disabled>
+                    Descargar Todas las Fotos
+                </button>
+            </div>
+
+            <!-- Galería de Vista Previa -->
+            <div class="lg:col-span-2">
+                <div id="previewArea" class="preview-container">
+                    <div class="col-span-full text-center py-20 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
+                        Las imágenes cargadas aparecerán aquí con su marca de agua.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const previewArea = document.getElementById('previewArea');
+        const proyectoInput = document.getElementById('proyectoInput');
+        const fechaInput = document.getElementById('fechaInput');
+        const tituloSelect = document.getElementById('tituloSelect');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        let uploadedImages = []; // Array de objetos { name, imgElement }
+
+        // Inicializar fecha de hoy
+        window.onload = () => {
+            const today = new Date().toISOString().split('T')[0];
+            fechaInput.value = today;
+        };
+
+        function handleImageUpload(event) {
+            const files = event.target.files;
+            if (files.length === 0) return;
+
+            previewArea.innerHTML = '';
+            uploadedImages = [];
+            downloadBtn.disabled = false;
+            downloadBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        uploadedImages.push({ name: file.name, imgElement: img });
+                        createImageCanvas(img, file.name);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function createImageCanvas(img, fileName) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'canvas-wrapper';
+            
+            const canvas = document.createElement('canvas');
+            // Mantener resolución original
+            canvas.width = img.width;
+            canvas.height = img.height;
+            
+            wrapper.appendChild(canvas);
+            previewArea.appendChild(wrapper);
+            
+            drawWatermark(canvas, img);
+        }
+
+        function drawWatermark(canvas, img) {
+            const ctx = canvas.getContext('2d');
+            
+            // Dibujar imagen original
+            ctx.drawImage(img, 0, 0);
+
+            // Configuración de texto (proporcional al tamaño de la imagen)
+            const baseFontSize = Math.max(canvas.width, canvas.height) * 0.045; // 4.5% de la dimensión mayor
+            const padding = baseFontSize * 0.8;
+            
+            ctx.fillStyle = 'white';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            ctx.shadowBlur = baseFontSize * 0.15;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            ctx.textAlign = 'left';
+            ctx.font = `bold ${baseFontSize}px Arial, sans-serif`;
+
+            const proyecto = proyectoInput.value;
+            const fechaRaw = fechaInput.value.split('-');
+            const fechaFormatted = `${fechaRaw[2]}-${fechaRaw[1]}-${fechaRaw[0]}`; // DD-MM-YYYY
+            const titulo = tituloSelect.value;
+
+            const x = padding;
+            let y = canvas.height - padding;
+
+            // Dibujar de abajo hacia arriba para replicar el orden de la foto
+            ctx.fillText(titulo, x, y);
+            y -= baseFontSize * 1.1;
+            ctx.fillText(fechaFormatted, x, y);
+            y -= baseFontSize * 1.1;
+            ctx.fillText(proyecto, x, y);
+        }
+
+        function updateAllCanvas() {
+            const canvases = previewArea.querySelectorAll('canvas');
+            canvases.forEach((canvas, index) => {
+                if (uploadedImages[index]) {
+                    drawWatermark(canvas, uploadedImages[index].imgElement);
+                }
+            });
+        }
+
+        // Manejo de títulos
+        function loadTitlesFromFile(input, category) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const lines = e.target.result.split(/\r?\n/);
+                lines.forEach(line => {
+                    if (line.trim()) {
+                        addOptionToSelect(`${line.trim()}`);  // Si se desea poner la categoria usar: ${category}: 
+                    }
+                });
+            };
+            reader.readAsText(file);
+        }
+
+        function addManualTitle() {
+            const input = document.getElementById('manualTitle');
+            if (input.value.trim()) {
+                addOptionToSelect(input.value.trim());
+                input.value = '';
+            }
+        }
+
+        function addOptionToSelect(text) {
+            const option = document.createElement('option');
+            option.value = text;
+            option.textContent = text;
+            tituloSelect.appendChild(option);
+        }
+
+        // Descarga
+        function downloadAll() {
+            const canvases = previewArea.querySelectorAll('canvas');
+            canvases.forEach((canvas, index) => {
+                const link = document.createElement('a');
+                link.download = `${uploadedImages[index].name}`;
+                link.href = canvas.toDataURL('image/jpeg', 0.9);
+                link.click();
+            });
+        }
+    </script>
+</body>
+</html>
