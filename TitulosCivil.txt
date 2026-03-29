@@ -86,6 +86,11 @@ Realización de ensayos de revenimiento
 Medición de temperatura del concreto
 Toma de cilindros para resistencia
 
-<14.Seguridad ocupacional y ambiental>
+<14. Gestión de materiales>
+Valoración de acero de refuerzo
+Limpieza
+Doblado y armado de estructuras metálicas de soporte
+
+<15.Seguridad ocupacional y ambiental>
 Uso del EPP
 Puesta a tierra de maquinaria
