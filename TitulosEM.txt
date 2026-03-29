@@ -1,2 +1,125 @@
-Seccionadoras
-Interruptores
+<No se realizaron trabajos electromecánicos>
+Feriado
+Revisión de diseños
+Visita técnica
+Permisos vencidos
+
+<Gestión de materiales>
+01.01 Recepción de equipos
+01.02 Inspección de tornillería
+01.03 Materiales para cableado
+01.04 Traslado de aisladores
+
+<Malla de Puesta a Tierra>
+02.01 Instalación de malla en área de equipos
+02.02 Conformación de cuadrícula
+02.03 Aterrizamiento de estructuras metálicas
+02.04 Reparación de conductores dañados
+
+<Estructuras menores de Soporte>
+03.01 Limpieza
+03.02 Clasificación y armado de columnas
+03.03 Montaje
+03.04 Nivelación y aplome
+
+<Estructuras mayores>
+04.01 Limpieza
+04.02 Armado provisional para verificación
+04.03 Montaje de vigas (ensamble de piezas)
+04.04 Izaje con grúas
+
+<Barras>
+05.01 Limpieza
+05.02 Armado provisional para verificación
+05.03 Montaje de elementos modulares (discos)
+05.04 Alineación de barras
+05.05 Izaje con grúas
+
+<Equipos principales>
+1<Transformadores de Potencial (TPs)>
+1<Transformadores de Corriente (TCs)>
+1<Seccionadoras paralela (sin PT)>
+1<Seccionadoras paralela (con PT)>
+1<Seccionadoras serie>
+1<Interruptores de Potencia (IPs)>
+1<Estructura de transición>
+2<Fase R>
+2<Fase S>
+2<Fase T>
+2<Todas>
+06.01 Inspección de defectos y compatibilidad geométrica
+06.02 Montaje sobre estructuras
+06.03 Aplome
+06.04 Ajuste de torques
+06.05 Calibración y otros ajustes
+06.06 Aplicación de protocolos de liberación
+
+<Construcción Edificio Shelter>
+07.01 Verificación de pernos de anclaje y niveles de base
+07.02 Montaje de módulos estructurales y paneles
+07.03 Instalación de racks y gabinetes de control/comunicaciones
+07.04 Montaje de unidades de aire acondicionado (HVAC)
+07.05 Instalación de tableros de servicios auxiliares (AC/DC)
+07.06 Montaje de luminarias y tomacorrientes internos
+07.07 Aterrizamiento de estructura y equipos internos (Puesta a Tierra)
+
+<Canalizaciones Eléctricas>
+08.01 Definición de rutas y trazado de bandejas/tuberías
+08.02 Instalación de soportería y ménsulas
+08.03 Montaje de bandejas portacables (escalerilla/perforada)
+08.04 Instalación de tubería conduit (con conectores y boquillas)
+08.05 Verificación de radios de curvatura en transiciones
+08.06 Limpieza interna de ductos
+08.07 Instalación de sellos cortafuego en entradas al búnker/shelter
+
+<Cajas de Registro e Intermedias>
+09.01 Revisión de especificaciones de tubería
+09.02 Separación y nivelación de tuberías
+09.03 Sellado de tuberías
+
+<Cableado de Control y Potencia>
+1<Control>
+1<Potencia>
+10.01 Clasificación de conductores
+10.02 Limpieza
+10.03 Identificación de cada monga
+10.04 Identificación de cada hilo
+
+<Conexionado de equipos>
+11.01 Fijación de mongas en gabinetes
+11.02 Conexión del apantallamiento
+11.03 Conexión de hilos en borneras
+11.04 Conexionado de cajas secundarias
+11.05 Pruebas punto a punto
+
+<Control, Protección y Medición>
+12.01 Revisión de controles de bahías
+12.02 Protecciones diferenciales
+12.03 Instalación de medidores en búnker
+12.04 Integración de esquemas PCyM
+
+<Pruebas Eléctricas y Dieléctricas>
+13.01 Resistencia de aislamiento
+13.02 Resistencia de contacto (seccionadoras)
+13.03 Prueba de apertura y cierre
+13.04 Pruebas a aisladores reparados
+
+<Puesta en Marcha>
+14.01 Coordinación actividades DGSNR
+14.02 Validación parámetros para operacion
+
+<Protocolos de liberación>
+15.01 Inspección visual final
+15.02 Verificación de cumplimiento de planos
+15.03 Firma de actas de liberación mecánica
+15.04 Firma de actas de liberación eléctrica
+
+<Reparación y Mantenimiento>
+16.01 Corrección de defectos geométricos
+16.02 Reparación de corrosión
+16.03 Aplicación de recubrimientos anticorrosivos
+
+<Documentación Técnica>
+17.01 Revisión de planos "as-built"
+17.02 Actualización de esquemas eléctricos
+17.03 Elaboración de actas de verificación
