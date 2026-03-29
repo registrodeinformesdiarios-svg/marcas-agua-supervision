@@ -85,3 +85,7 @@ Resanes superficiales
 Realización de ensayos de revenimiento
 Medición de temperatura del concreto
 Toma de cilindros para resistencia
+
+<14.Seguridad ocupacional y ambiental>
+Uso del EPP
+Puesta a tierra de maquinaria
