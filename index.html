@@ -25,6 +25,14 @@
             height: auto;
             display: block;
         }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 10px;
+        }
     </style>
 </head>
 
@@ -33,7 +41,7 @@
     <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6">
         <header class="border-b pb-4 mb-6">
             <h1 class="text-2xl font-bold text-gray-800">Marcador de Fotos de Proyecto</h1>
-            <p class="text-gray-500">Carga tus fotos y aplica la marca de agua personalizada.</p>
+            <p class="text-gray-500">Gestión de marcas de agua jerárquicas para reportes de obra.</p>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -42,11 +50,9 @@
                 <section class="bg-blue-50 p-4 rounded-lg border border-blue-100">
                     <h2 class="font-semibold text-blue-800 mb-3 flex items-center">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2">
-                            </path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                         </svg>
-                        Datos de la Marca
+                        Datos Generales
                     </h2>
 
                     <div class="space-y-4">
@@ -63,84 +69,90 @@
                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                                 oninput="updateAllCanvas()">
                         </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Título / Descripción</label>
-                            <select id="tituloSelect"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                                onchange="updateAllCanvas()">
-                                <option value="Prensa terminales">Prensa terminales (Default)</option>
-                            </select>
-                        </div>
                     </div>
                 </section>
 
                 <section class="bg-green-50 p-4 rounded-lg border border-green-100">
                     <h2 class="font-semibold text-green-800 mb-3 flex items-center">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4">
-                            </path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path>
                         </svg>
-                        Fuentes de Títulos
+                        Selección de Actividad
                     </h2>
 
-                    <div class="space-y-3">
+                    <div class="space-y-4">
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase">Cargar TXT
-                                (Electromecánicos)</label>
-                            <input type="file" accept=".txt" class="text-sm" onchange="loadTitlesFromFile(this, 'EM')"
-                                onload="loadTitlesFromFile(this, 'EM')">
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Especialidad</label>
+                            <select id="especialidadSelect" onchange="switchEspecialidad()"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border">
+                                <option value="">Seleccione especialidad...</option>
+                                <option value="EM">Electromecánico</option>
+                                <option value="Civil">Civil</option>
+                            </select>
+                            <div id="loadingCatalog" class="hidden mt-1 text-xs text-blue-600 animate-pulse font-bold">Cargando catálogo automático...</div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase">Cargar TXT (Civiles)</label>
-                            <input type="file" accept=".txt" class="text-sm"
-                                onchange="loadTitlesFromFile(this, 'Civil')">
+
+                        <div id="fileUploadContainer" class="hidden border-t pt-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Sobrescribir Catálogo (.txt)</label>
+                            <input type="file" id="fileInput" accept=".txt" class="text-sm w-full mt-1" onchange="processTxtFile(this)">
                         </div>
-                        <div class="pt-2 border-t">
-                            <label class="block text-xs font-bold text-gray-500 uppercase">Añadir Manualmente</label>
-                            <div class="flex gap-1 mt-1">
-                                <input type="text" id="manualTitle" placeholder="Nuevo título..."
-                                    class="text-sm border p-1 rounded w-full">
-                                <button onclick="addManualTitle()"
-                                    class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">Añadir</button>
+
+                        <div id="selectionsContainer" class="space-y-3 hidden">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Tema Principal</label>
+                                <select id="temaSelect" onchange="handleTemaChange()"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border">
+                                </select>
+                            </div>
+
+                            <div id="dynamicOptions"></div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Sugerencias de Título</label>
+                                <select id="tituloSelect" onchange="syncTituloInput()"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border">
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Título Personalizado (Editable)</label>
+                                <textarea id="tituloManualInput" rows="2"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                    placeholder="Escribe o edita el título aquí..."
+                                    oninput="updateAllCanvas()"></textarea>
                             </div>
                         </div>
                     </div>
                 </section>
 
                 <div class="pt-4">
-                    <label
-                        class="flex flex-col items-center px-4 py-6 bg-white text-blue rounded-lg shadow-lg tracking-wide uppercase border border-blue cursor-pointer hover:bg-blue-500 hover:text-white transition-all">
+                    <label class="flex flex-col items-center px-4 py-6 bg-white text-blue-600 rounded-lg shadow-lg tracking-wide uppercase border border-blue-200 cursor-pointer hover:bg-blue-50 transition-all">
                         <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                                d="M16.88 9.1L13.47 5.7C12.7 4.93 11.41 4.93 10.64 5.7L6.23 10.1C5.85 10.48 5.65 11 5.65 11.54V13.5C5.65 14.33 6.32 15 7.15 15H9.11C9.65 15 10.17 14.8 10.55 14.42L14.96 10.02C15.73 9.25 15.73 7.96 14.96 7.19L16.88 9.1ZM12.12 7.12L14.07 9.07L13.12 10.02L11.17 8.07L12.12 7.12ZM7.65 13.5V12.04L9.61 14H7.15C7.15 13.5 7.65 13.5 7.65 13.5Z">
-                            </path>
+                            <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"></path>
                         </svg>
-                        <span class="mt-2 text-base leading-normal">Seleccionar Imágenes</span>
-                        <input type="file" id="imageInput" multiple accept="image/*" class="hidden"
-                            onchange="handleImageUpload(event)">
+                        <span class="mt-2 text-sm font-bold">Cargar Fotos</span>
+                        <input type="file" id="imageInput" multiple accept="image/*" class="hidden" onchange="handleImageUpload(event)">
                     </label>
                 </div>
 
-                <button id="downloadBtn" onclick="downloadAll()"
-                    class="w-full bg-gray-800 text-white font-bold py-3 rounded-lg opacity-50 cursor-not-allowed"
-                    disabled>
-                    Descargar Todas las Fotos
-                </button>
+                <div class="flex flex-col gap-2">
+                    <button id="downloadBtn" onclick="downloadAll()"
+                        class="w-full bg-gray-800 text-white font-bold py-3 rounded-lg opacity-50 cursor-not-allowed transition-all" disabled>
+                        Descargar Todas
+                    </button>
 
-                <button id="uploadDriveBtn" onclick="uploadToDrive()"
-                    class="w-full mt-2 bg-blue-600 text-white font-bold py-3 rounded-lg opacity-50 cursor-not-allowed"
-                    disabled>
-                    Subir a Google Drive
-                </button>
+                    <button id="uploadDriveBtn" onclick="uploadToDrive()"
+                        class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg opacity-50 cursor-not-allowed transition-all" disabled>
+                        Subir a Google Drive
+                    </button>
+                </div>
             </div>
 
-            <!-- Galería de Vista Previa -->
+            <!-- Galería -->
             <div class="lg:col-span-2">
-                <div id="previewArea" class="preview-container">
-                    <div
-                        class="col-span-full text-center py-20 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
-                        Las imágenes cargadas aparecerán aquí con su marca de agua.
+                <div id="previewArea" class="preview-container custom-scrollbar max-h-screen overflow-y-auto pr-2">
+                    <div class="col-span-full text-center py-20 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">
+                        Cargue imágenes para visualizar la marca de agua.
                     </div>
                 </div>
             </div>
@@ -148,41 +160,175 @@
     </div>
 
     <script>
-        const imageInput = document.getElementById('imageInput');
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzGS8fb-JTT8giSlV3dST9r4wOK-Vk2-yUY4jKqbsOWro8F1YEN0vH9wXg0rOiRfqeX/exec";
+        
+        const URLS_CATALOGO = {
+            "Civil": "https://raw.githubusercontent.com/registrodeinformesdiarios-svg/marcas-agua-supervision/refs/heads/main/TitulosCivil.txt",
+            "EM": "https://raw.githubusercontent.com/registrodeinformesdiarios-svg/marcas-agua-supervision/refs/heads/main/TitulosEM.txt"
+        };
+
         const previewArea = document.getElementById('previewArea');
         const proyectoInput = document.getElementById('proyectoInput');
         const fechaInput = document.getElementById('fechaInput');
+        const temaSelect = document.getElementById('temaSelect');
         const tituloSelect = document.getElementById('tituloSelect');
+        const tituloManualInput = document.getElementById('tituloManualInput');
+        const dynamicOptions = document.getElementById('dynamicOptions');
         const downloadBtn = document.getElementById('downloadBtn');
+        const uploadDriveBtn = document.getElementById('uploadDriveBtn');
+        const selectionsContainer = document.getElementById('selectionsContainer');
+        const fileUploadContainer = document.getElementById('fileUploadContainer');
+        const loadingCatalog = document.getElementById('loadingCatalog');
 
-        // Recuerda habilitar este botón en tu función handleImageUpload:
-        document.getElementById('uploadDriveBtn').disabled = false;
-        document.getElementById('uploadDriveBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+        let dataCatalogo = {}; 
+        let uploadedImages = [];
 
-        let uploadedImages = []; // Array de objetos { name, imgElement }
-
-        // Inicializar fecha de hoy
         window.onload = () => {
             const today = new Date().toISOString().split('T')[0];
             fechaInput.value = today;
         };
 
+        async function switchEspecialidad() {
+            const esp = document.getElementById('especialidadSelect').value;
+            
+            // Limpiar estado previo
+            selectionsContainer.classList.add('hidden');
+            fileUploadContainer.classList.add('hidden');
+            loadingCatalog.classList.add('hidden');
+
+            if (esp) {
+                fileUploadContainer.classList.remove('hidden');
+                
+                if (URLS_CATALOGO[esp]) {
+                    loadingCatalog.classList.remove('hidden');
+                    try {
+                        const response = await fetch(URLS_CATALOGO[esp] + "?t=" + new Date().getTime());
+                        if (!response.ok) throw new Error("Error al obtener el archivo");
+                        const text = await response.text();
+                        
+                        if (text && text.trim().length > 0) {
+                            parseAndLoadCatalog(text);
+                            selectionsContainer.classList.remove('hidden');
+                        } else {
+                            throw new Error("El archivo está vacío");
+                        }
+                    } catch (error) {
+                        console.error("No se pudo cargar el catálogo automático:", error);
+                        alert("Error al cargar desde GitHub. Por favor, selecciona el archivo manualmente usando 'Sobrescribir Catálogo'.");
+                    } finally {
+                        loadingCatalog.classList.add('hidden');
+                    }
+                }
+            }
+        }
+
+        function processTxtFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                parseAndLoadCatalog(e.target.result);
+                selectionsContainer.classList.remove('hidden');
+            };
+            reader.readAsText(file);
+        }
+
+        function parseAndLoadCatalog(content) {
+            const lines = content.split(/\r?\n/);
+            let currentTema = null;
+            dataCatalogo = {};
+
+            lines.forEach(line => {
+                line = line.trim();
+                if (!line) return;
+                const temaMatch = line.match(/^<(.+)>$/);
+                if (temaMatch) {
+                    currentTema = temaMatch[1];
+                    dataCatalogo[currentTema] = { options: {}, titles: [] };
+                    return;
+                }
+                if (currentTema) {
+                    const optMatch = line.match(/^(\d+)<(.+)>$/);
+                    if (optMatch) {
+                        const level = optMatch[1];
+                        const text = optMatch[2];
+                        if (!dataCatalogo[currentTema].options[level]) dataCatalogo[currentTema].options[level] = [];
+                        dataCatalogo[currentTema].options[level].push(text);
+                    } else {
+                        dataCatalogo[currentTema].titles.push(line);
+                    }
+                }
+            });
+            populateTemas();
+        }
+
+        function populateTemas() {
+            temaSelect.innerHTML = '';
+            const temas = Object.keys(dataCatalogo);
+            if (temas.length === 0) return;
+
+            temas.forEach(tema => {
+                const opt = document.createElement('option');
+                opt.value = tema; opt.textContent = tema;
+                temaSelect.appendChild(opt);
+            });
+            handleTemaChange();
+        }
+
+        function handleTemaChange() {
+            const tema = temaSelect.value;
+            if (!tema || !dataCatalogo[tema]) return;
+            
+            const config = dataCatalogo[tema];
+            dynamicOptions.innerHTML = '';
+            
+            if (config.options) {
+                Object.keys(config.options).sort().forEach(level => {
+                    const div = document.createElement('div');
+                    div.className = "mb-2";
+                    div.innerHTML = `
+                        <label class="block text-xs font-bold text-gray-500 uppercase">Opción ${level}</label>
+                        <select class="dynamic-opt-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" onchange="updateAllCanvas()">
+                            ${config.options[level].map(o => `<option value="${o}">${o}</option>`).join('')}
+                        </select>`;
+                    dynamicOptions.appendChild(div);
+                });
+            }
+            
+            tituloSelect.innerHTML = '';
+            config.titles.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t; opt.textContent = t;
+                tituloSelect.appendChild(opt);
+            });
+            syncTituloInput();
+        }
+
+        function syncTituloInput() {
+            tituloManualInput.value = tituloSelect.value;
+            updateAllCanvas();
+        }
+
         function handleImageUpload(event) {
             const files = event.target.files;
             if (files.length === 0) return;
-
             previewArea.innerHTML = '';
             uploadedImages = [];
-            downloadBtn.disabled = false;
-            downloadBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-
+            const activateButtons = () => {
+                downloadBtn.disabled = false;
+                downloadBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                uploadDriveBtn.disabled = false;
+                uploadDriveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            };
             Array.from(files).forEach(file => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const img = new Image();
                     img.onload = () => {
                         uploadedImages.push({ name: file.name, imgElement: img });
-                        createImageCanvas(img, file.name);
+                        createImageCanvas(img);
+                        activateButtons();
                     };
                     img.src = e.target.result;
                 };
@@ -190,53 +336,95 @@
             });
         }
 
-        function createImageCanvas(img, fileName) {
+        function createImageCanvas(img) {
             const wrapper = document.createElement('div');
             wrapper.className = 'canvas-wrapper';
-
             const canvas = document.createElement('canvas');
-            // Mantener resolución original
             canvas.width = img.width;
             canvas.height = img.height;
-
             wrapper.appendChild(canvas);
             previewArea.appendChild(wrapper);
-
             drawWatermark(canvas, img);
+        }
+
+        function wrapText(ctx, text, x, y, maxWidth, lineHeight, baseSize) {
+            let words = text.split(' ');
+            let line = '';
+            let lines = [];
+            let currentFontSize = baseSize;
+
+            if (text.length > 50) currentFontSize = baseSize * 0.85;
+            if (text.length > 80) currentFontSize = baseSize * 0.75;
+            
+            ctx.font = `bold ${currentFontSize}px Arial, sans-serif`;
+
+            for (let n = 0; n < words.length; n++) {
+                let testLine = line + words[n] + ' ';
+                let metrics = ctx.measureText(testLine);
+                let testWidth = metrics.width;
+                if (testWidth > maxWidth && n > 0) {
+                    lines.push(line);
+                    line = words[n] + ' ';
+                } else {
+                    line = testLine;
+                }
+            }
+            lines.push(line);
+
+            for (let i = lines.length - 1; i >= 0; i--) {
+                ctx.fillText(lines[i], x, y);
+                y -= lineHeight * (currentFontSize / baseSize);
+            }
+            return lines.length;
+        }
+
+        function getMetadata() {
+            const tema = temaSelect.value;
+            const dOpts = Array.from(document.querySelectorAll('.dynamic-opt-select')).map(s => s.value);
+            return [tema, ...dOpts].join(' / ');
+        }
+
+        function getMetadataForFilename() {
+            const tema = temaSelect.value;
+            const dOpts = Array.from(document.querySelectorAll('.dynamic-opt-select')).map(s => s.value);
+            return [tema, ...dOpts].join('-');
         }
 
         function drawWatermark(canvas, img) {
             const ctx = canvas.getContext('2d');
-
-            // Dibujar imagen original
             ctx.drawImage(img, 0, 0);
 
-            // Configuración de texto (proporcional al tamaño de la imagen)
-            const baseFontSize = Math.max(canvas.width, canvas.height) * 0.045; // 4.5% de la dimensión mayor
+            const baseFontSize = Math.max(canvas.width, canvas.height) * 0.035;
             const padding = baseFontSize * 0.8;
+            const maxWidth = canvas.width - (padding * 2);
+
+            const proyecto = proyectoInput.value;
+            const fechaRaw = fechaInput.value.split('-');
+            const fechaFormatted = `${fechaRaw[2]}-${fechaRaw[1]}-${fechaRaw[0]}`;
+            const titulo = tituloManualInput.value;
+            const metadata = getMetadata();
 
             ctx.fillStyle = 'white';
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
             ctx.shadowBlur = baseFontSize * 0.15;
             ctx.shadowOffsetX = 2;
             ctx.shadowOffsetY = 2;
             ctx.textAlign = 'left';
+
+            let currentY = canvas.height - padding;
+
+            ctx.font = `italic ${baseFontSize * 0.6}px Arial, sans-serif`;
+            ctx.fillText(metadata, padding, currentY);
+            
+            currentY -= baseFontSize * 0.9;
+            const linesUsed = wrapText(ctx, titulo, padding, currentY, maxWidth, baseFontSize * 1.1, baseFontSize * 1.1);
+
+            currentY -= (linesUsed * baseFontSize * 1.1) + (baseFontSize * 0.2);
             ctx.font = `bold ${baseFontSize}px Arial, sans-serif`;
-
-            const proyecto = proyectoInput.value;
-            const fechaRaw = fechaInput.value.split('-');
-            const fechaFormatted = `${fechaRaw[2]}-${fechaRaw[1]}-${fechaRaw[0]}`; // DD-MM-YYYY
-            const titulo = tituloSelect.value;
-
-            const x = padding;
-            let y = canvas.height - padding;
-
-            // Dibujar de abajo hacia arriba para replicar el orden de la foto
-            ctx.fillText(titulo, x, y);
-            y -= baseFontSize * 1.1;
-            ctx.fillText(fechaFormatted, x, y);
-            y -= baseFontSize * 1.1;
-            ctx.fillText(proyecto, x, y);
+            ctx.fillText(fechaFormatted, padding, currentY);
+            
+            currentY -= baseFontSize * 1.1;
+            ctx.fillText(proyecto, padding, currentY);
         }
 
         function updateAllCanvas() {
@@ -248,94 +436,59 @@
             });
         }
 
-        // Manejo de títulos
-        function loadTitlesFromFile(input, category) {
-            const file = input.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const lines = e.target.result.split(/\r?\n/);
-                lines.forEach(line => {
-                    if (line.trim()) {
-                        addOptionToSelect(`${line.trim()}`);  // Si se desea poner la categoria usar: ${category}: 
-                    }
-                });
-            };
-            reader.readAsText(file);
+        function getFormattedDateForFilename() {
+            return fechaInput.value.replace(/-/g, '');
         }
 
-        function addManualTitle() {
-            const input = document.getElementById('manualTitle');
-            if (input.value.trim()) {
-                addOptionToSelect(input.value.trim());
-                input.value = '';
-            }
+        function generateCustomFileName(index) {
+            const fecha = getFormattedDateForFilename();
+            const titulo = tituloManualInput.value.trim().substring(0, 50);
+            const meta = getMetadataForFilename();
+            return `${fecha}_${titulo} (${meta})_${index + 1}.jpg`;
         }
 
-        function addOptionToSelect(text) {
-            const option = document.createElement('option');
-            option.value = text;
-            option.textContent = text;
-            tituloSelect.appendChild(option);
-        }
-
-        // Descarga
         function downloadAll() {
             const canvases = previewArea.querySelectorAll('canvas');
             canvases.forEach((canvas, index) => {
                 const link = document.createElement('a');
-                link.download = `${uploadedImages[index].name}`;
+                link.download = generateCustomFileName(index);
                 link.href = canvas.toDataURL('image/jpeg', 0.9);
                 link.click();
             });
         }
 
-        //const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz_fK6tReB353bD4Xw5qE_FCyzWL-ASkz7zdAZMNL_rx6RC6NCJXSoVjJRTuk4qnabn/exec";
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzGS8fb-JTT8giSlV3dST9r4wOK-Vk2-yUY4jKqbsOWro8F1YEN0vH9wXg0rOiRfqeX/exec";
-        
-        //De prueba:
-        //const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxiTMMMqY_S77l8WVEQfJpJqWzHsFXr7Zijv0mAnSQ/dev";
-
         async function uploadToDrive() {
             const canvases = document.querySelectorAll('canvas');
-            if (canvases.length === 0) return alert("No hay imágenes para subir");
-
-            // 1. Obtener y formatear la fecha (de "2026-03-29" a "20260329")
-            const fechaRaw = document.getElementById('fechaInput').value; // yyyy-mm-dd
-            const fechaFormateada = fechaRaw.replace(/-/g, '');
-
-            // 2. Obtener la etiqueta (Título/Descripción)
-            const etiqueta = document.getElementById('tituloSelect').value;
+            if (canvases.length === 0) return;
 
             const btn = document.getElementById('uploadDriveBtn');
             btn.innerText = "Subiendo... ⏳";
             btn.disabled = true;
 
+            let successCount = 0;
+
             for (let i = 0; i < canvases.length; i++) {
                 const canvas = canvases[i];
-                // Obtenemos el base64 completo
                 const fullBase64 = canvas.toDataURL('image/jpeg', 0.8);
-                //const fileName = `Foto_${i + 1}_${new Date().getTime()}.jpg`;
-                const fileName = `${fechaFormateada}_${etiqueta}_${i + 1}.jpg`;
+                const fileName = generateCustomFileName(i);
 
                 try {
-                    const response = await fetch(SCRIPT_URL, {
+                    await fetch(SCRIPT_URL, {
                         method: 'POST',
-                        mode: 'no-cors', // Importante para evitar bloqueos de seguridad simples
+                        mode: 'no-cors',
                         body: JSON.stringify({
                             base64: fullBase64,
                             type: 'image/jpeg',
                             name: fileName
                         })
                     });
-                    console.log(`Enviada imagen ${i + 1}`);
-                } catch (error) {
-                    console.error("Error en envío:", error);
+                    successCount++;
+                } catch (error) { 
+                    console.error("Error en subida:", error); 
                 }
             }
 
-            alert("Proceso finalizado. Revisa tu carpeta de Drive.");
+            alert(`Proceso finalizado. Se han enviado ${successCount} fotos a Google Drive.`);
             btn.innerText = "Subir a Google Drive";
             btn.disabled = false;
         }
