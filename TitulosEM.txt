@@ -4,38 +4,38 @@ Revisión de diseños
 Visita técnica
 Permisos vencidos
 
-<Gestión de materiales>
-01.01 Recepción de equipos
-01.02 Inspección de tornillería
-01.03 Materiales para cableado
-01.04 Traslado de aisladores
+<1.Gestión de materiales>
+Recepción de equipos
+Inspección de tornillería
+Materiales para cableado
+Traslado de aisladores
 
-<Malla de Puesta a Tierra>
-02.01 Instalación de malla en área de equipos
-02.02 Conformación de cuadrícula
-02.03 Aterrizamiento de estructuras metálicas
-02.04 Reparación de conductores dañados
+<2.Malla de Puesta a Tierra>
+Instalación de malla en área de equipos
+Conformación de cuadrícula
+Aterrizamiento de estructuras metálicas
+Reparación de conductores dañados
 
-<Estructuras menores de Soporte>
-03.01 Limpieza
-03.02 Clasificación y armado de columnas
-03.03 Montaje
-03.04 Nivelación y aplome
+<3.Estructuras menores de Soporte>
+Limpieza
+Clasificación y armado de columnas
+Montaje
+Nivelación y aplome
 
-<Estructuras mayores>
-04.01 Limpieza
-04.02 Armado provisional para verificación
-04.03 Montaje de vigas (ensamble de piezas)
-04.04 Izaje con grúas
+<4.Estructuras mayores>
+Limpieza
+Armado provisional para verificación
+Montaje de vigas (ensamble de piezas)
+Izaje con grúas
 
-<Barras>
-05.01 Limpieza
-05.02 Armado provisional para verificación
-05.03 Montaje de elementos modulares (discos)
-05.04 Alineación de barras
-05.05 Izaje con grúas
+<5.Barras>
+Limpieza
+Armado provisional para verificación
+Montaje de elementos modulares (discos)
+Alineación de barras
+Izaje con grúas
 
-<Equipos principales>
+<6.Equipos principales>
 1<Transformadores de Potencial (TPs)>
 1<Transformadores de Corriente (TCs)>
 1<Seccionadoras paralela (sin PT)>
@@ -47,79 +47,79 @@ Permisos vencidos
 2<Fase S>
 2<Fase T>
 2<Todas>
-06.01 Inspección de defectos y compatibilidad geométrica
-06.02 Montaje sobre estructuras
-06.03 Aplome
-06.04 Ajuste de torques
-06.05 Calibración y otros ajustes
-06.06 Aplicación de protocolos de liberación
+Inspección de defectos y compatibilidad geométrica
+Montaje sobre estructuras
+Aplome
+Ajuste de torques
+Calibración y otros ajustes
+Aplicación de protocolos de liberación
 
-<Construcción Edificio Shelter>
-07.01 Verificación de pernos de anclaje y niveles de base
-07.02 Montaje de módulos estructurales y paneles
-07.03 Instalación de racks y gabinetes de control/comunicaciones
-07.04 Montaje de unidades de aire acondicionado (HVAC)
-07.05 Instalación de tableros de servicios auxiliares (AC/DC)
-07.06 Montaje de luminarias y tomacorrientes internos
-07.07 Aterrizamiento de estructura y equipos internos (Puesta a Tierra)
+<7.Construcción Edificio Shelter>
+Verificación de pernos de anclaje y niveles de base
+Montaje de módulos estructurales y paneles
+Instalación de racks y gabinetes de control/comunicaciones
+Montaje de unidades de aire acondicionado (HVAC)
+Instalación de tableros de servicios auxiliares (AC/DC)
+Montaje de luminarias y tomacorrientes internos
+Aterrizamiento de estructura y equipos internos (Puesta a Tierra)
 
-<Canalizaciones Eléctricas>
-08.01 Definición de rutas y trazado de bandejas/tuberías
-08.02 Instalación de soportería y ménsulas
-08.03 Montaje de bandejas portacables (escalerilla/perforada)
-08.04 Instalación de tubería conduit (con conectores y boquillas)
-08.05 Verificación de radios de curvatura en transiciones
-08.06 Limpieza interna de ductos
-08.07 Instalación de sellos cortafuego en entradas al búnker/shelter
+<8.Canalizaciones Eléctricas>
+Definición de rutas y trazado de bandejas/tuberías
+Instalación de soportería y ménsulas
+Montaje de bandejas portacables (escalerilla/perforada)
+Instalación de tubería conduit (con conectores y boquillas)
+Verificación de radios de curvatura en transiciones
+Limpieza interna de ductos
+Instalación de sellos cortafuego en entradas al búnker/shelter
 
-<Cajas de Registro e Intermedias>
-09.01 Revisión de especificaciones de tubería
-09.02 Separación y nivelación de tuberías
-09.03 Sellado de tuberías
+<9.Cajas de Registro e Intermedias>
+Revisión de especificaciones de tubería
+Separación y nivelación de tuberías
+Sellado de tuberías
 
-<Cableado de Control y Potencia>
+<10.Cableado de Control y Potencia>
 1<Control>
 1<Potencia>
 10.01 Clasificación de conductores
-10.02 Limpieza
-10.03 Identificación de cada monga
-10.04 Identificación de cada hilo
+Limpieza
+Identificación de cada monga
+Identificación de cada hilo
 
-<Conexionado de equipos>
-11.01 Fijación de mongas en gabinetes
-11.02 Conexión del apantallamiento
-11.03 Conexión de hilos en borneras
-11.04 Conexionado de cajas secundarias
-11.05 Pruebas punto a punto
+<11.Conexionado de equipos>
+Fijación de mongas en gabinetes
+Conexión del apantallamiento
+Conexión de hilos en borneras
+Conexionado de cajas secundarias
+Pruebas punto a punto
 
-<Control, Protección y Medición>
-12.01 Revisión de controles de bahías
-12.02 Protecciones diferenciales
-12.03 Instalación de medidores en búnker
-12.04 Integración de esquemas PCyM
+<12.Control, Protección y Medición>
+Revisión de controles de bahías
+Protecciones diferenciales
+Instalación de medidores en búnker
+Integración de esquemas PCyM
 
-<Pruebas Eléctricas y Dieléctricas>
-13.01 Resistencia de aislamiento
-13.02 Resistencia de contacto (seccionadoras)
-13.03 Prueba de apertura y cierre
-13.04 Pruebas a aisladores reparados
+<13.Pruebas Eléctricas y Dieléctricas>
+Resistencia de aislamiento
+Resistencia de contacto (seccionadoras)
+Prueba de apertura y cierre
+Pruebas a aisladores reparados
 
-<Puesta en Marcha>
-14.01 Coordinación actividades DGSNR
-14.02 Validación parámetros para operacion
+<14.Puesta en Marcha>
+Coordinación actividades DGSNR
+Validación parámetros para operacion
 
-<Protocolos de liberación>
-15.01 Inspección visual final
-15.02 Verificación de cumplimiento de planos
-15.03 Firma de actas de liberación mecánica
-15.04 Firma de actas de liberación eléctrica
+<15.Protocolos de liberación>
+Inspección visual final
+Verificación de cumplimiento de planos
+Firma de actas de liberación mecánica
+Firma de actas de liberación eléctrica
 
-<Reparación y Mantenimiento>
-16.01 Corrección de defectos geométricos
-16.02 Reparación de corrosión
-16.03 Aplicación de recubrimientos anticorrosivos
+<16.Reparación y Mantenimiento>
+Corrección de defectos geométricos
+Reparación de corrosión
+Aplicación de recubrimientos anticorrosivos
 
-<Documentación Técnica>
-17.01 Revisión de planos "as-built"
-17.02 Actualización de esquemas eléctricos
-17.03 Elaboración de actas de verificación
+<17.Documentación Técnica>
+Revisión de planos "as-built"
+Actualización de esquemas eléctricos
+Elaboración de actas de verificación
