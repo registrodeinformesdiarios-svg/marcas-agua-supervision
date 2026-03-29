@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,12 +12,14 @@
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 1rem;
         }
+
         .canvas-wrapper {
             position: relative;
             border-radius: 0.5rem;
             overflow: hidden;
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
         }
+
         canvas {
             width: 100%;
             height: auto;
@@ -24,6 +27,7 @@
         }
     </style>
 </head>
+
 <body class="bg-gray-100 min-h-screen p-4 md:p-8">
 
     <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6">
@@ -37,24 +41,34 @@
             <div class="space-y-6">
                 <section class="bg-blue-50 p-4 rounded-lg border border-blue-100">
                     <h2 class="font-semibold text-blue-800 mb-3 flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2">
+                            </path>
+                        </svg>
                         Datos de la Marca
                     </h2>
-                    
+
                     <div class="space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Proyecto</label>
-                            <input type="text" id="proyectoInput" value="PS Tecales" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" oninput="updateAllCanvas()">
+                            <input type="text" id="proyectoInput" value="PS Tecales"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                oninput="updateAllCanvas()">
                         </div>
-                        
+
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Fecha</label>
-                            <input type="date" id="fechaInput" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" oninput="updateAllCanvas()">
+                            <input type="date" id="fechaInput"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                oninput="updateAllCanvas()">
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Título / Descripción</label>
-                            <select id="tituloSelect" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" onchange="updateAllCanvas()">
+                            <select id="tituloSelect"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                onchange="updateAllCanvas()">
                                 <option value="Prensa terminales">Prensa terminales (Default)</option>
                             </select>
                         </div>
@@ -63,46 +77,69 @@
 
                 <section class="bg-green-50 p-4 rounded-lg border border-green-100">
                     <h2 class="font-semibold text-green-800 mb-3 flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4">
+                            </path>
+                        </svg>
                         Fuentes de Títulos
                     </h2>
-                    
+
                     <div class="space-y-3">
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase">Cargar TXT (Electromecánicos)</label>
-                            <input type="file" accept=".txt" class="text-sm" onchange="loadTitlesFromFile(this, 'EM')" onload="loadTitlesFromFile(this, 'EM')">
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Cargar TXT
+                                (Electromecánicos)</label>
+                            <input type="file" accept=".txt" class="text-sm" onchange="loadTitlesFromFile(this, 'EM')"
+                                onload="loadTitlesFromFile(this, 'EM')">
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase">Cargar TXT (Civiles)</label>
-                            <input type="file" accept=".txt" class="text-sm" onchange="loadTitlesFromFile(this, 'Civil')">
+                            <input type="file" accept=".txt" class="text-sm"
+                                onchange="loadTitlesFromFile(this, 'Civil')">
                         </div>
                         <div class="pt-2 border-t">
                             <label class="block text-xs font-bold text-gray-500 uppercase">Añadir Manualmente</label>
                             <div class="flex gap-1 mt-1">
-                                <input type="text" id="manualTitle" placeholder="Nuevo título..." class="text-sm border p-1 rounded w-full">
-                                <button onclick="addManualTitle()" class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">Añadir</button>
+                                <input type="text" id="manualTitle" placeholder="Nuevo título..."
+                                    class="text-sm border p-1 rounded w-full">
+                                <button onclick="addManualTitle()"
+                                    class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">Añadir</button>
                             </div>
                         </div>
                     </div>
                 </section>
 
                 <div class="pt-4">
-                    <label class="flex flex-col items-center px-4 py-6 bg-white text-blue rounded-lg shadow-lg tracking-wide uppercase border border-blue cursor-pointer hover:bg-blue-500 hover:text-white transition-all">
-                        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path d="M16.88 9.1L13.47 5.7C12.7 4.93 11.41 4.93 10.64 5.7L6.23 10.1C5.85 10.48 5.65 11 5.65 11.54V13.5C5.65 14.33 6.32 15 7.15 15H9.11C9.65 15 10.17 14.8 10.55 14.42L14.96 10.02C15.73 9.25 15.73 7.96 14.96 7.19L16.88 9.1ZM12.12 7.12L14.07 9.07L13.12 10.02L11.17 8.07L12.12 7.12ZM7.65 13.5V12.04L9.61 14H7.15C7.15 13.5 7.65 13.5 7.65 13.5Z"></path></svg>
+                    <label
+                        class="flex flex-col items-center px-4 py-6 bg-white text-blue rounded-lg shadow-lg tracking-wide uppercase border border-blue cursor-pointer hover:bg-blue-500 hover:text-white transition-all">
+                        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                            <path
+                                d="M16.88 9.1L13.47 5.7C12.7 4.93 11.41 4.93 10.64 5.7L6.23 10.1C5.85 10.48 5.65 11 5.65 11.54V13.5C5.65 14.33 6.32 15 7.15 15H9.11C9.65 15 10.17 14.8 10.55 14.42L14.96 10.02C15.73 9.25 15.73 7.96 14.96 7.19L16.88 9.1ZM12.12 7.12L14.07 9.07L13.12 10.02L11.17 8.07L12.12 7.12ZM7.65 13.5V12.04L9.61 14H7.15C7.15 13.5 7.65 13.5 7.65 13.5Z">
+                            </path>
+                        </svg>
                         <span class="mt-2 text-base leading-normal">Seleccionar Imágenes</span>
-                        <input type="file" id="imageInput" multiple accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                        <input type="file" id="imageInput" multiple accept="image/*" class="hidden"
+                            onchange="handleImageUpload(event)">
                     </label>
                 </div>
 
-                <button id="downloadBtn" onclick="downloadAll()" class="w-full bg-gray-800 text-white font-bold py-3 rounded-lg opacity-50 cursor-not-allowed" disabled>
+                <button id="downloadBtn" onclick="downloadAll()"
+                    class="w-full bg-gray-800 text-white font-bold py-3 rounded-lg opacity-50 cursor-not-allowed"
+                    disabled>
                     Descargar Todas las Fotos
+                </button>
+
+                <button id="uploadDriveBtn" onclick="uploadToDrive()"
+                    class="w-full mt-2 bg-blue-600 text-white font-bold py-3 rounded-lg opacity-50 cursor-not-allowed"
+                    disabled>
+                    Subir a Google Drive
                 </button>
             </div>
 
             <!-- Galería de Vista Previa -->
             <div class="lg:col-span-2">
                 <div id="previewArea" class="preview-container">
-                    <div class="col-span-full text-center py-20 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
+                    <div
+                        class="col-span-full text-center py-20 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
                         Las imágenes cargadas aparecerán aquí con su marca de agua.
                     </div>
                 </div>
@@ -117,6 +154,10 @@
         const fechaInput = document.getElementById('fechaInput');
         const tituloSelect = document.getElementById('tituloSelect');
         const downloadBtn = document.getElementById('downloadBtn');
+
+        // Recuerda habilitar este botón en tu función handleImageUpload:
+        document.getElementById('uploadDriveBtn').disabled = false;
+        document.getElementById('uploadDriveBtn').classList.remove('opacity-50', 'cursor-not-allowed');
 
         let uploadedImages = []; // Array de objetos { name, imgElement }
 
@@ -152,28 +193,28 @@
         function createImageCanvas(img, fileName) {
             const wrapper = document.createElement('div');
             wrapper.className = 'canvas-wrapper';
-            
+
             const canvas = document.createElement('canvas');
             // Mantener resolución original
             canvas.width = img.width;
             canvas.height = img.height;
-            
+
             wrapper.appendChild(canvas);
             previewArea.appendChild(wrapper);
-            
+
             drawWatermark(canvas, img);
         }
 
         function drawWatermark(canvas, img) {
             const ctx = canvas.getContext('2d');
-            
+
             // Dibujar imagen original
             ctx.drawImage(img, 0, 0);
 
             // Configuración de texto (proporcional al tamaño de la imagen)
             const baseFontSize = Math.max(canvas.width, canvas.height) * 0.045; // 4.5% de la dimensión mayor
             const padding = baseFontSize * 0.8;
-            
+
             ctx.fillStyle = 'white';
             ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
             ctx.shadowBlur = baseFontSize * 0.15;
@@ -249,6 +290,55 @@
                 link.click();
             });
         }
+
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz_fK6tReB353bD4Xw5qE_FCyzWL-ASkz7zdAZMNL_rx6RC6NCJXSoVjJRTuk4qnabn/exec";
+
+        //De prueba:
+        //const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxiTMMMqY_S77l8WVEQfJpJqWzHsFXr7Zijv0mAnSQ/dev";
+
+        async function uploadToDrive() {
+            const canvases = document.querySelectorAll('canvas');
+            if (canvases.length === 0) return alert("No hay imágenes para subir");
+
+            // 1. Obtener y formatear la fecha (de "2026-03-29" a "20260329")
+            const fechaRaw = document.getElementById('fechaInput').value; // yyyy-mm-dd
+            const fechaFormateada = fechaRaw.replace(/-/g, '');
+
+            // 2. Obtener la etiqueta (Título/Descripción)
+            const etiqueta = document.getElementById('tituloSelect').value;
+
+            const btn = document.getElementById('uploadDriveBtn');
+            btn.innerText = "Subiendo... ⏳";
+            btn.disabled = true;
+
+            for (let i = 0; i < canvases.length; i++) {
+                const canvas = canvases[i];
+                // Obtenemos el base64 completo
+                const fullBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                //const fileName = `Foto_${i + 1}_${new Date().getTime()}.jpg`;
+                const fileName = `${fechaFormateada}_${etiqueta}_${i + 1}.jpg`;
+
+                try {
+                    const response = await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors', // Importante para evitar bloqueos de seguridad simples
+                        body: JSON.stringify({
+                            base64: fullBase64,
+                            type: 'image/jpeg',
+                            name: fileName
+                        })
+                    });
+                    console.log(`Enviada imagen ${i + 1}`);
+                } catch (error) {
+                    console.error("Error en envío:", error);
+                }
+            }
+
+            alert("Proceso finalizado. Revisa tu carpeta de Drive.");
+            btn.innerText = "Subir a Google Drive";
+            btn.disabled = false;
+        }
     </script>
 </body>
+
 </html>
