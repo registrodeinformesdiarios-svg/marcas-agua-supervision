@@ -135,6 +135,14 @@
                     </label>
                 </div>
 
+                <div class="flex items-center gap-2 py-1">
+                    <input type="checkbox" id="mostrarLeyenda" checked onchange="updateAllCanvas()"
+                        class="w-4 h-4 accent-blue-600 cursor-pointer">
+                    <label for="mostrarLeyenda" class="text-sm font-medium text-gray-700 cursor-pointer select-none">
+                        Mostrar leyenda en la foto
+                    </label>
+                </div>
+
                 <div class="flex flex-col gap-2">
                     <button id="downloadBtn" onclick="downloadAll()"
                         class="w-full bg-gray-800 text-white font-bold py-3 rounded-lg opacity-50 cursor-not-allowed transition-all" disabled>
@@ -393,6 +401,8 @@
         function drawWatermark(canvas, img) {
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0);
+
+            if (!document.getElementById('mostrarLeyenda').checked) return;
 
             const baseFontSize = Math.max(canvas.width, canvas.height) * 0.035;
             const padding = baseFontSize * 0.8;
