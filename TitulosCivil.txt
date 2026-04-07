@@ -11,9 +11,9 @@ Colocación de guías de trazado
 Levantamientos de elevaciones finales
 
 <2.Excavaciones>
-02.01 Remoción de capa superficial
-02.02 Excavación para cimientos y zanjas de canalización
-02.03 Clasificación de material extraído
+Remoción de capa superficial
+Excavación para cimientos y zanjas de canalización
+Clasificación de material extraído
 
 <3.Cimientos>
 Construcción de placas de fundación
