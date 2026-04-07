@@ -16,13 +16,13 @@ Levantamientos de elevaciones finales
 02.03 Clasificación de material extraído
 
 <3.Cimientos>
-03.01 Construcción de placas de fundación
-03.02 Pedestales
-03.03 Armaduras
-03.04 Preparación de acero
-03.05 Formaleteado y colada
-03.06 Colocación de sellos
-03.07 Pernos de anclaje
+Construcción de placas de fundación
+Pedestales
+Armaduras
+Preparación de acero
+Formaleteado y colada
+Colocación de sellos
+Pernos de anclaje
 
 <4.Muros>
 Ejecución de sello
