@@ -3,7 +3,6 @@ Feriado
 Revisión de diseños
 Visita técnica
 Permisos vencidos
-Feriado llj
 
 <1.Gestión de materiales>
 Recepción de equipos
