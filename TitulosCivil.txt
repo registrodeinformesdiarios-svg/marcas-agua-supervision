@@ -94,3 +94,4 @@ Doblado y armado de estructuras metálicas de soporte
 <15.Seguridad ocupacional y ambiental>
 Uso del EPP
 Puesta a tierra de maquinaria
+
