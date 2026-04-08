@@ -1,1 +1,131 @@
-Nuevo contenido del archivo...
+<No se realizaron trabajos electromecánicos>
+Feriado
+Revisión de diseños
+Visita técnica
+Permisos vencidos
+Feriado llj
+
+<1.Gestión de materiales>
+Recepción de equipos
+Inspección de tornillería
+Materiales para cableado
+Traslado de aisladores
+
+<2.Malla de Puesta a Tierra>
+Instalación de malla en área de equipos
+Conformación de cuadrícula
+Aterrizamiento de estructuras metálicas
+Reparación de conductores dañados
+
+<3.Estructuras menores de Soporte>
+Limpieza
+Clasificación y armado de columnas
+Montaje
+Nivelación y aplome
+
+<4.Estructuras mayores>
+Limpieza
+Armado provisional para verificación
+Montaje de vigas (ensamble de piezas)
+Izaje con grúas
+
+<5.Barras>
+Limpieza
+Armado provisional para verificación
+Montaje de elementos modulares (discos)
+Alineación de barras
+Izaje con grúas
+
+<6.Equipos principales>
+1<Transformadores de Potencial (TPs)>
+1<Transformadores de Corriente (TCs)>
+1<Seccionadoras paralela (sin PT)>
+1<Seccionadoras paralela (con PT)>
+1<Seccionadoras serie>
+1<Interruptores de Potencia (IPs)>
+1<Estructura de transición>
+2<Fase R>
+2<Fase S>
+2<Fase T>
+2<Todas>
+Inspección de defectos y compatibilidad geométrica
+Montaje sobre estructuras
+Aplome
+Ajuste de torques
+Calibración y otros ajustes
+Aplicación de protocolos de liberación
+
+<7.Construcción Edificio Shelter>
+Verificación de pernos de anclaje y niveles de base
+Montaje de módulos estructurales y paneles
+Instalación de racks y gabinetes de control/comunicaciones
+Montaje de unidades de aire acondicionado (HVAC)
+Instalación de tableros de servicios auxiliares (AC/DC)
+Montaje de luminarias y tomacorrientes internos
+Aterrizamiento de estructura y equipos internos (Puesta a Tierra)
+
+<8.Canalizaciones Eléctricas>
+Definición de rutas y trazado de bandejas/tuberías
+Instalación de soportería y ménsulas
+Montaje de bandejas portacables (escalerilla/perforada)
+Instalación de tubería conduit (con conectores y boquillas)
+Verificación de radios de curvatura en transiciones
+Limpieza interna de ductos
+Instalación de sellos cortafuego en entradas al búnker/shelter
+
+<9.Cajas de Registro e Intermedias>
+Revisión de especificaciones de tubería
+Separación y nivelación de tuberías
+Sellado de tuberías
+
+<10.Cableado de Control y Potencia>
+1<Control>
+1<Potencia>
+10.01 Clasificación de conductores
+Limpieza
+Identificación de cada monga
+Identificación de cada hilo
+
+<11.Conexionado de equipos>
+Fijación de mongas en gabinetes
+Conexión del apantallamiento
+Conexión de hilos en borneras
+Conexionado de cajas secundarias
+Pruebas punto a punto
+
+<12.Control, Protección y Medición>
+Revisión de controles de bahías
+Protecciones diferenciales
+Instalación de medidores en búnker
+Integración de esquemas PCyM
+
+<13.Pruebas Eléctricas y Dieléctricas>
+Resistencia de aislamiento
+Resistencia de contacto (seccionadoras)
+Prueba de apertura y cierre
+Pruebas a aisladores reparados
+
+<14.Puesta en Marcha>
+Coordinación actividades DGSNR
+Validación parámetros para operacion
+
+<15.Protocolos de liberación>
+Inspección visual final
+Verificación de cumplimiento de planos
+Firma de actas de liberación mecánica
+Firma de actas de liberación eléctrica
+
+<16.Reparación y Mantenimiento>
+Corrección de defectos geométricos
+Reparación de corrosión
+Aplicación de recubrimientos anticorrosivos
+
+<17.Documentación Técnica>
+Revisión de planos "as-built"
+Actualización de esquemas eléctricos
+Elaboración de actas de verificación
+
+<18.Seguridad ocupacional y ambiental>
+Uso del EPP
+Puesta a tierra de maquinaria
+
