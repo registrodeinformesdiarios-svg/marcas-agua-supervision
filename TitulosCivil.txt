@@ -9,7 +9,6 @@ Marcado de ejes
 Determinación de niveles
 Colocación de guías de trazado
 Levantamientos de elevaciones finales
-Marcado de ejes (Andres)
 
 <2.Excavaciones>
 Remoción de capa superficial
