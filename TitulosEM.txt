@@ -27,6 +27,7 @@ Limpieza
 Armado provisional para verificación
 Montaje de vigas (ensamble de piezas)
 Izaje con grúas
+Mediciones de verificación
 
 <5.Barras>
 Limpieza
