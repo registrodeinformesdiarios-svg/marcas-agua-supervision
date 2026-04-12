@@ -3,6 +3,7 @@ Feriado
 Revisión de diseños
 Visita técnica
 Permisos vencidos
+Figuras informe
 
 <1.Gestión de materiales>
 Recepción de equipos
