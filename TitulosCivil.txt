@@ -122,6 +122,7 @@ Toma de cilindros para resistencia
 Valoración de acero de refuerzo
 Limpieza
 Doblado y armado de estructuras metálicas de soporte
+Traslado de materiales
 
 <15.Seguridad ocupacional y ambiental>
 Uso del EPP
