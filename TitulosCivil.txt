@@ -5,6 +5,7 @@ Visita técnica
 Permisos vencidos
 
 <1.Topografía>
+Mediciones generales
 Marcado de ejes
 Determinación de niveles
 Colocación de guías de trazado
@@ -20,6 +21,7 @@ Clasificación de material extraído
 1<F2>
 1<F3>
 1<F4>
+1<Otro>
 2<Mayor A>
 2<Mayor B>
 2<Mayor C>
