@@ -62,7 +62,7 @@ Interconexiones del sistema
 1<Caja registro>
 1<Caja control>
 1<Caja potencia>
-1<Caja>
+1<Otras cajas>
 2<TPs>
 2<TCs>
 2<IP>
@@ -131,3 +131,16 @@ Puesta a tierra de maquinaria
 <16.Progreso general>
 Estado actual
 
+<17.No conformidades>
+1<F1>
+1<F2>
+1<F3>
+1<F4>
+1<Caja transición>
+1<Caja registro>
+1<Caja control>
+1<Caja potencia>
+1<Otras cajas>
+1<Otro>
+Incumplimiento en documentación
+Incumplimiento en fabricación
