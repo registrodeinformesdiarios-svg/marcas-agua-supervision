@@ -127,6 +127,7 @@ Doblado y armado de estructuras metálicas de soporte
 Uso del EPP
 Puesta a tierra de maquinaria
 Ambiente
+Cerramiento
 
 <16.Progreso general>
 Estado actual
