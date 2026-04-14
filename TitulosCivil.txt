@@ -127,6 +127,7 @@ Traslado de materiales
 <15.Seguridad ocupacional y ambiental>
 Uso del EPP
 Puesta a tierra de maquinaria
+Cerramiento
 
 <16.Progreso general>
 Estado actual
