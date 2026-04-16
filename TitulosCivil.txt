@@ -70,6 +70,7 @@ Interconexiones del sistema
 2<Secc. paralela PT>
 2<Secc. Serie>
 2<Estructura de transición>
+2<Otros>
 Acero (armaduras)
 Construcción por etapas (placa y paredes)
 Instalación de formaletas
