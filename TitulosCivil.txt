@@ -126,12 +126,12 @@ Valoración de acero de refuerzo
 Limpieza
 Doblado y armado de estructuras metálicas de soporte
 Traslado de materiales
+Concreto f´c 140kg/cm²
 
 <15.Seguridad ocupacional y ambiental>
 Uso del EPP
 Puesta a tierra de maquinaria
 Cerramiento
-Ambiente
 
 <16.Progreso general>
 Estado actual
