@@ -15,7 +15,6 @@ Levantamientos de elevaciones finales
 Remoción de capa superficial
 Excavación para cimientos y zanjas de canalización
 Clasificación de material extraído
-Curado
 
 <3.Cimientos>
 1<F1>
@@ -132,6 +131,7 @@ Traslado de materiales
 Uso del EPP
 Puesta a tierra de maquinaria
 Cerramiento
+Ambiente
 
 <16.Progreso general>
 Estado actual
