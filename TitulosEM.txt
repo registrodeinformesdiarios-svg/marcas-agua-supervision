@@ -10,6 +10,7 @@ Recepción de equipos
 Inspección de tornillería
 Materiales para cableado
 Traslado de aisladores
+Herramientas
 
 <2.Malla de Puesta a Tierra>
 Instalación de malla en área de equipos
@@ -146,3 +147,4 @@ Estado actual
 1<Otro>
 Incumplimiento en documentación
 Incumplimiento en fabricación
+
