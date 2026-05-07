@@ -20,6 +20,33 @@
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
         }
 
+        .canvas-wrapper .btn-delete-photo {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.55);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 15px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.15s ease, background 0.15s ease;
+            z-index: 10;
+        }
+        .canvas-wrapper:hover .btn-delete-photo {
+            opacity: 1;
+        }
+        .canvas-wrapper .btn-delete-photo:hover {
+            background: rgba(220,38,38,0.85);
+        }
+
         canvas {
             width: 100%;
             height: auto;
@@ -33,18 +60,202 @@
             background-color: #cbd5e1;
             border-radius: 10px;
         }
+
+        #uploadProgressContainer {
+            transition: opacity 0.3s ease;
+        }
+
+        #uploadProgressBar {
+            transition: width 0.2s ease;
+        }
+
+        .photo-skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.2s infinite;
+            border-radius: 0.5rem;
+            aspect-ratio: 4/3;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
     </style>
 </head>
 
 <body class="bg-gray-100 min-h-screen p-4 md:p-8">
 
-    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6">
-        <header class="border-b pb-4 mb-6">
-            <h1 class="text-2xl font-bold text-gray-800">Marcador de Fotos de Proyecto</h1>
-            <p class="text-gray-500">Gestión de marcas de agua jerárquicas para reportes de obra.</p>
+    <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6">
+        <header class="border-b pb-4 mb-4">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Marcador de Fotos de Proyecto</h1>
+                    <p class="text-gray-500">Gestión de marcas de agua jerárquicas para reportes de obra.</p>
+                </div>
+                <!-- Banner del proyecto activo (visible solo si hay ?proyecto= en URL) -->
+                <div id="proyectoBanner" class="hidden shrink-0">
+                    <div class="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                        <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                        </svg>
+                        <div>
+                            <p class="text-xs text-blue-500 font-semibold uppercase tracking-wide leading-tight">Proyecto</p>
+                            <p id="proyectoBannerNombre" class="text-sm font-bold text-blue-800 leading-tight"></p>
+                        </div>
+                        <div id="proyectoCatalogStatus" class="ml-1">
+                            <span id="proyectoCatalogLoading" class="hidden text-xs text-blue-400 animate-pulse">Cargando catálogo...</span>
+                            <span id="proyectoCatalogOk" class="hidden text-xs text-green-600 font-bold">✓ Catálogo cargado</span>
+                            <span id="proyectoCatalogErr" class="hidden text-xs text-orange-500 font-medium">Sin catálogo en Drive</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- ══ CATÁLOGO PERSONAL — barra horizontal completa ══ -->
+        <div class="mb-5">
+            <!-- Hidden import input -->
+            <input type="file" id="catalogTxtImportInput" accept=".txt" class="hidden" onchange="catalogImportarTxt(this)">
+
+            <div id="catalogCard" class="border border-purple-200 rounded-xl shadow-sm overflow-hidden">
+
+                <!-- Header siempre visible — ancho completo -->
+                <div class="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white cursor-pointer select-none" onclick="toggleCatalogEditor()">
+                    <svg class="w-5 h-5 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                    </svg>
+                    <div class="flex-1 min-w-0">
+                        <span class="font-bold text-sm">Mi Catálogo</span>
+                        <span id="catalogHeaderStatus" class="ml-2 text-purple-200 text-xs">Sin catálogo guardado</span>
+                    </div>
+                    <!-- Chevron colapso -->
+                    <svg id="catalogChevron" class="w-4 h-4 shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                    <!-- Menú opciones (no propagar click al toggle) -->
+                    <div class="relative" id="catalogMenuWrapper" onclick="event.stopPropagation()">
+                        <button onclick="toggleCatalogMenu()" class="p-1.5 rounded-lg bg-purple-500 hover:bg-purple-400 transition-all" title="Opciones">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+                            </svg>
+                        </button>
+                        <div id="catalogMenu" class="hidden absolute right-0 top-9 z-30 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 w-52 text-xs">
+                            <button onclick="catalogDescargarTxt(); toggleCatalogMenu()" class="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 text-gray-700">
+                                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                Descargar como .txt
+                            </button>
+                            <button onclick="catalogCargarTxt(); toggleCatalogMenu()" class="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 text-gray-700">
+                                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12"/></svg>
+                                Importar desde .txt
+                            </button>
+                            <hr class="my-1 border-gray-100">
+                            <button onclick="abrirModalPropuestaDesdeEditor(); toggleCatalogMenu()" class="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 text-gray-700">
+                                <svg class="w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                                Sugerir a GitHub
+                            </button>
+                            <hr class="my-1 border-gray-100">
+                            <button onclick="catalogBorrarLocal(); toggleCatalogMenu()" class="w-full text-left px-4 py-2.5 hover:bg-red-50 text-red-500 flex items-center gap-2.5">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                Borrar catálogo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cuerpo colapsable -->
+                <div id="catalogBody" class="hidden">
+
+                    <!-- Estado inicial: sin catálogo -->
+                    <div id="catalogEmpty" class="p-6 text-center">
+                        <p class="text-sm text-gray-500 mb-4">¿Cómo quieres iniciar tu catálogo personal?</p>
+                        <div class="flex flex-wrap justify-center gap-2">
+                            <button onclick="initCatalogFromGithub()"
+                                class="text-sm bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 transition-all flex items-center gap-2">
+                                <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                                Copiar desde GitHub
+                            </button>
+                            <button onclick="initCatalogEmpty()"
+                                class="text-sm bg-white text-gray-700 font-semibold py-2 px-4 rounded-lg border border-gray-300 hover:bg-gray-50 transition-all">
+                                Empezar desde cero
+                            </button>
+                            <label class="text-sm bg-white text-gray-700 font-semibold py-2 px-4 rounded-lg border border-gray-300 hover:bg-gray-50 transition-all cursor-pointer">
+                                Importar .txt
+                                <input type="file" accept=".txt" class="hidden" onchange="catalogImportarTxt(this)">
+                            </label>
+                        </div>
+                        <div id="catalogInitLoading" class="hidden mt-3 text-sm text-purple-600 animate-pulse font-bold">Cargando desde GitHub...</div>
+                    </div>
+
+                    <!-- Editor activo — layout horizontal en pantallas grandes -->
+                    <div id="catalogEditor" class="hidden p-4">
+                        <!-- Fila de controles: especialidad + tema -->
+                        <div class="flex flex-wrap gap-3 items-end mb-4 pb-4 border-b border-gray-100">
+                            <div class="flex items-center gap-2">
+                                <label class="text-xs font-bold text-gray-500 uppercase whitespace-nowrap">Especialidad</label>
+                                <select id="editorEspSelect" onchange="editorSwitchEsp()"
+                                    class="rounded-lg border-gray-200 text-xs p-2 border focus:border-purple-400 focus:outline-none bg-gray-50">
+                                    <option value="EM">Electromecánico</option>
+                                    <option value="Civil">Civil</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-2 flex-1 min-w-[200px]">
+                                <label class="text-xs font-bold text-gray-500 uppercase whitespace-nowrap">Tema</label>
+                                <select id="editorTemaSelect" onchange="editorLoadTema()"
+                                    class="flex-1 rounded-lg border-gray-200 text-xs p-2 border focus:border-purple-400 focus:outline-none bg-white min-w-0">
+                                </select>
+                                <button onclick="editorNuevoTema()" title="Nuevo tema"
+                                    class="shrink-0 w-7 h-7 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-sm font-bold flex items-center justify-center">+</button>
+                                <button onclick="editorRenombrarTema()" title="Renombrar tema"
+                                    class="shrink-0 w-7 h-7 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg flex items-center justify-center">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                </button>
+                                <button onclick="editorEliminarTema()" title="Eliminar tema"
+                                    class="shrink-0 w-7 h-7 bg-red-50 hover:bg-red-100 text-red-400 rounded-lg flex items-center justify-center">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Dos columnas: opciones de nivel | títulos -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                            <!-- Opciones de nivel -->
+                            <div id="editorOpcionesSection">
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Opciones de nivel</label>
+                                    <button onclick="editorAgregarGrupoOpcion()"
+                                        class="text-xs text-purple-600 hover:text-purple-800 font-semibold flex items-center gap-1 bg-purple-50 hover:bg-purple-100 px-2 py-1 rounded-lg transition-all">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                        Nuevo grupo
+                                    </button>
+                                </div>
+                                <div id="editorOpcionesContainer" class="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1"></div>
+                            </div>
+
+                            <!-- Títulos -->
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Títulos</label>
+                                    <span id="editorTitulosCount" class="text-xs text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded-full"></span>
+                                </div>
+                                <div id="editorTitulosList" class="space-y-1 max-h-52 overflow-y-auto custom-scrollbar pr-1 mb-2"></div>
+                                <div class="flex gap-1">
+                                    <input type="text" id="editorNuevoTitulo" placeholder="Nuevo título..."
+                                        class="flex-1 text-xs rounded-lg border-gray-200 p-2 border focus:border-purple-400 focus:outline-none min-w-0"
+                                        onkeydown="if(event.key==='Enter') editorAgregarTitulo()">
+                                    <button onclick="editorAgregarTitulo()" title="Agregar"
+                                        class="shrink-0 w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg font-bold text-lg flex items-center justify-center transition-all">+</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div><!-- /catalogBody -->
+            </div><!-- /catalogCard -->
+        </div><!-- /catalog wrapper mb-5 -->
+
+        <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] gap-6">
             <!-- Panel de Configuración -->
             <div class="space-y-6">
                 <section class="bg-blue-50 p-4 rounded-lg border border-blue-100">
@@ -125,13 +336,20 @@
                     </div>
                 </section>
 
-                <div class="pt-4">
+                <div class="pt-4 flex flex-col gap-2">
                     <label class="flex flex-col items-center px-4 py-6 bg-white text-blue-600 rounded-lg shadow-lg tracking-wide uppercase border border-blue-200 cursor-pointer hover:bg-blue-50 transition-all">
                         <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"></path>
                         </svg>
                         <span class="mt-2 text-sm font-bold">Cargar Fotos</span>
-                        <input type="file" id="imageInput" multiple accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                        <input type="file" id="imageInput" multiple accept="image/*" class="hidden" onchange="handleImageUpload(event, false)">
+                    </label>
+                    <label id="addMoreBtn" class="hidden flex items-center justify-center gap-2 px-4 py-3 bg-green-50 text-green-700 rounded-lg border border-green-200 cursor-pointer hover:bg-green-100 transition-all font-semibold text-sm">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Agregar más fotos
+                        <input type="file" id="imageInputExtra" multiple accept="image/*" class="hidden" onchange="handleImageUpload(event, true)">
                     </label>
                 </div>
 
@@ -153,21 +371,71 @@
                         class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg opacity-50 cursor-not-allowed transition-all" disabled>
                         Subir a Google Drive
                     </button>
+
+                    <!-- Botón subir catálogo al proyecto — solo visible si hay ?proyecto= -->
+                    <div id="uploadCatalogBtnContainer" class="hidden pt-2 border-t border-gray-100">
+                        <p class="text-xs text-gray-400 mb-1 text-center">Catálogo del proyecto</p>
+                        <button id="uploadCatalogBtn" onclick="subirCatalogoAlProyecto()"
+                            class="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-lg hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 text-sm">
+                            <svg class="w-4 h-4" viewBox="0 0 87.3 78" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3L28.6 48H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066DA"/>
+                                <path d="M43.65 25L29.25 0c-1.35.8-2.5 1.9-3.3 3.3L1.2 43.5C.4 44.9 0 46.45 0 48h28.6z" fill="#00AC47"/>
+                                <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75L86.1 56.5c.8-1.4 1.2-2.95 1.2-4.5H58.7l6.1 11.4z" fill="#EA4335"/>
+                                <path d="M43.65 25L58.05 0H29.25z" fill="#00832D"/>
+                                <path d="M58.7 48l-15-26H28.6l15 26z" fill="#2684FC"/>
+                                <path d="M73.55 76.8L58.7 48H28.6l14.85 25.7 1.2 2.1c.8-.05 1.6-.2 2.35-.5z" fill="#FFBA00"/>
+                            </svg>
+                            Subir catálogo al proyecto
+                        </button>
+                        <p id="uploadCatalogStatus" class="hidden mt-1 text-xs text-center font-medium"></p>
+                    </div>
                 </div>
             </div>
 
             <!-- Galería -->
-            <div class="lg:col-span-2">
+            <div>
+                <!-- Barra de progreso de carga -->
+                <div id="uploadProgressContainer" class="hidden mb-4 bg-blue-50 border border-blue-100 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold text-blue-800">Procesando fotos...</span>
+                        <span id="uploadProgressText" class="text-sm font-bold text-blue-700">0 / 0</span>
+                    </div>
+                    <div class="w-full bg-blue-200 rounded-full h-3 overflow-hidden">
+                        <div id="uploadProgressBar" class="bg-blue-600 h-3 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <p id="uploadCurrentFile" class="mt-2 text-xs text-blue-600 truncate">Iniciando...</p>
+                </div>
+
+                <!-- Barra de progreso de subida a Drive -->
+                <div id="driveProgressContainer" class="hidden mb-4 bg-indigo-50 border border-indigo-100 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold text-indigo-800 flex items-center gap-2">
+                            <svg class="w-4 h-4 shrink-0" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3L28.6 48H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066DA"/>
+                                <path d="M43.65 25L29.25 0c-1.35.8-2.5 1.9-3.3 3.3L1.2 43.5C.4 44.9 0 46.45 0 48h28.6z" fill="#00AC47"/>
+                                <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75L86.1 56.5c.8-1.4 1.2-2.95 1.2-4.5H58.7l6.1 11.4z" fill="#EA4335"/>
+                                <path d="M43.65 25L58.05 0H29.25z" fill="#00832D"/>
+                                <path d="M58.7 48l-15-26H28.6l15 26z" fill="#2684FC"/>
+                                <path d="M73.55 76.8L58.7 48H28.6l14.85 25.7 1.2 2.1c.8-.05 1.6-.2 2.35-.5z" fill="#FFBA00"/>
+                            </svg>
+                            Subiendo a Google Drive...
+                        </span>
+                        <span id="driveProgressText" class="text-sm font-bold text-indigo-700">0 / 0</span>
+                    </div>
+                    <div class="w-full bg-indigo-200 rounded-full h-3 overflow-hidden">
+                        <div id="driveProgressBar" class="bg-indigo-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <p id="driveCurrentFile" class="mt-2 text-xs text-indigo-600 truncate">Preparando archivos...</p>
+                </div>
+
                 <div id="previewArea" class="preview-container custom-scrollbar max-h-screen overflow-y-auto pr-2">
                     <div class="col-span-full text-center py-20 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">
                         Cargue imágenes para visualizar la marca de agua.
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Modal de propuesta de nuevo título -->
+        <!-- Modal de propuesta de nuevo título -->
     <div id="modalPropuesta" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 animate-fade-in">
             <div class="flex items-center gap-3 mb-4">
@@ -203,12 +471,19 @@
 
     <script>
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzGS8fb-JTT8giSlV3dST9r4wOK-Vk2-yUY4jKqbsOWro8F1YEN0vH9wXg0rOiRfqeX/exec";
-        const WORKER_URL = "https://red-bush-8bae.julio220115838.workers.dev/enviar-pr"; // ← Reemplaza con la URL de tu Worker
+        const WORKER_URL = "https://red-bush-8bae.julio220115838.workers.dev/enviar-pr";
+
+        // ── App Script para catálogos de proyecto en Drive ─────────────────
+        const CATALOG_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx768wbs79en6lCrR9Q_9hfso3pf_fS_JOvanACvYE0tLRdiZpdjFU-4ADJTzL_wwVqNg/exec"; // ← Pega aquí la URL del Web App desplegado
 
         const URLS_CATALOGO = {
             "Civil": "https://raw.githubusercontent.com/registrodeinformesdiarios-svg/marcas-agua-supervision/refs/heads/main/TitulosCivil.txt",
             "EM": "https://raw.githubusercontent.com/registrodeinformesdiarios-svg/marcas-agua-supervision/refs/heads/main/TitulosEM.txt"
         };
+
+        // ── Leer parámetro ?proyecto= de la URL ───────────────────────────
+        const URL_PARAMS    = new URLSearchParams(window.location.search);
+        const PROYECTO_PARAM = URL_PARAMS.get("proyecto") || "";
 
         const previewArea = document.getElementById('previewArea');
         const proyectoInput = document.getElementById('proyectoInput');
@@ -229,7 +504,155 @@
         window.onload = () => {
             const today = new Date().toISOString().split('T')[0];
             fechaInput.value = today;
+
+            // Si hay ?proyecto= en la URL, inicializar el modo proyecto
+            if (PROYECTO_PARAM) {
+                iniciarModoProyecto();
+            }
         };
+
+        // ── MODO PROYECTO ──────────────────────────────────────────────────
+        // Si la URL tiene ?proyecto=NombreProyecto, se intenta cargar el
+        // catálogo desde Drive (vía App Script) y se muestra el banner.
+        // El botón "Subir catálogo al proyecto" permite actualizar ese archivo.
+        // ──────────────────────────────────────────────────────────────────
+
+        async function iniciarModoProyecto() {
+            // Mostrar banner
+            document.getElementById('proyectoBanner').classList.remove('hidden');
+            document.getElementById('proyectoBannerNombre').textContent = PROYECTO_PARAM;
+            document.getElementById('proyectoInput').value = PROYECTO_PARAM;
+            updateAllCanvas();
+
+            // Mostrar botón de subir catálogo
+            document.getElementById('uploadCatalogBtnContainer').classList.remove('hidden');
+
+            // Cargar catálogo del proyecto para ambas especialidades desde Drive
+            // (se aplica cuando el usuario seleccione la especialidad)
+            cargarCatalogoProyecto();
+        }
+
+        // Cache de catálogos descargados de Drive en esta sesión
+        const _catalogosDrive = {};
+
+        async function cargarCatalogoProyecto() {
+            if (!PROYECTO_PARAM || CATALOG_SCRIPT_URL === "REEMPLAZAR_CON_URL_DEL_APP_SCRIPT") return;
+
+            const statusLoading = document.getElementById('proyectoCatalogLoading');
+            const statusOk      = document.getElementById('proyectoCatalogOk');
+            const statusErr     = document.getElementById('proyectoCatalogErr');
+
+            statusLoading.classList.remove('hidden');
+            statusOk.classList.add('hidden');
+            statusErr.classList.add('hidden');
+
+            let alguno = false;
+            for (const esp of ["EM", "Civil"]) {
+                try {
+                    const url = `${CATALOG_SCRIPT_URL}?action=get&proyecto=${encodeURIComponent(PROYECTO_PARAM)}&esp=${esp}&t=${Date.now()}`;
+                    const res = await fetch(url, { redirect: 'follow' });
+                    const text = await res.text();
+
+                    // Si responde JSON con ok:false, no hay catálogo
+                    let parsed;
+                    try { parsed = JSON.parse(text); } catch { parsed = null; }
+                    if (parsed && parsed.ok === false) continue;
+
+                    // Guardar en cache
+                    _catalogosDrive[esp] = text;
+                    alguno = true;
+                } catch(e) {
+                    console.warn("Error cargando catálogo de Drive para", esp, e);
+                }
+            }
+
+            statusLoading.classList.add('hidden');
+            if (alguno) {
+                statusOk.classList.remove('hidden');
+            } else {
+                statusErr.classList.remove('hidden');
+            }
+        }
+
+        // Función para obtener el catálogo a usar al seleccionar especialidad:
+        // prioridad: Drive del proyecto > localStorage personal > GitHub
+        function getCatalogoParaEsp(esp) {
+            if (PROYECTO_PARAM && _catalogosDrive[esp]) return { fuente: "drive", data: _catalogosDrive[esp] };
+            const local = catalogoGuardado ? catalogoGuardado(esp) : null;  // catalogoGuardado definida más abajo
+            if (local !== null) return { fuente: "local", data: local };
+            return { fuente: "github", data: null };
+        }
+
+        // ── Subir catálogos (EM + Civil) al Drive del proyecto ─────────────
+        async function subirCatalogoAlProyecto() {
+            if (!PROYECTO_PARAM) return;
+            if (CATALOG_SCRIPT_URL === "REEMPLAZAR_CON_URL_DEL_APP_SCRIPT") {
+                alert("Configura CATALOG_SCRIPT_URL en el código primero.");
+                return;
+            }
+
+            // Recopilar qué especialidades tienen catálogo guardado
+            const paraSubir = [];
+            for (const esp of ["EM", "Civil"]) {
+                const cat = catalogoGuardado ? catalogoGuardado(esp) : null;
+                if (cat && Object.keys(cat).length > 0) {
+                    paraSubir.push({ esp, cat });
+                }
+            }
+
+            if (paraSubir.length === 0) {
+                alert("No hay catálogos personales guardados para subir.\nEdita tu catálogo en el panel superior primero.");
+                return;
+            }
+
+            const labels = paraSubir.map(x => x.esp === "EM" ? "Electromecánico" : "Civil").join(" y ");
+            if (!confirm(`¿Subir los catálogos de ${labels} al proyecto "${PROYECTO_PARAM}" en Google Drive?
+
+Esto sobreescribirá los archivos actuales del proyecto.`)) return;
+
+            const btn = document.getElementById('uploadCatalogBtn');
+            const statusEl = document.getElementById('uploadCatalogStatus');
+            btn.disabled = true;
+            btn.classList.add('opacity-75');
+            statusEl.classList.remove('hidden');
+
+            let subidos = 0;
+            for (const { esp, cat } of paraSubir) {
+                const label = esp === "EM" ? "Electromecánico" : "Civil";
+                statusEl.className = "mt-1 text-xs text-center font-medium text-blue-500";
+                statusEl.textContent = `Subiendo ${label}... (${subidos + 1}/${paraSubir.length})`;
+
+                try {
+                    const contenido = catalogToTxt(cat);
+                    await fetch(CATALOG_SCRIPT_URL, {
+                        method: "POST",
+                        mode: "no-cors",
+                        body: JSON.stringify({
+                            action: "update",
+                            proyecto: PROYECTO_PARAM,
+                            esp,
+                            contenido
+                        })
+                    });
+                    _catalogosDrive[esp] = contenido;
+                    subidos++;
+                } catch(e) {
+                    statusEl.className = "mt-1 text-xs text-center font-medium text-red-500";
+                    statusEl.textContent = `❌ Error en ${label}: ${e.message}`;
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-75');
+                    return;
+                }
+            }
+
+            statusEl.className = "mt-1 text-xs text-center font-medium text-green-600";
+            statusEl.textContent = `✅ ${subidos === 2 ? "Ambos catálogos subidos" : "Catálogo subido"} al proyecto`;
+            document.getElementById('proyectoCatalogOk').classList.remove('hidden');
+            document.getElementById('proyectoCatalogErr').classList.add('hidden');
+            btn.disabled = false;
+            btn.classList.remove('opacity-75');
+            setTimeout(() => statusEl.classList.add('hidden'), 5000);
+        }
 
         async function switchEspecialidad() {
             const esp = document.getElementById('especialidadSelect').value;
@@ -353,41 +776,150 @@
             updateAllCanvas();
         }
 
-        function handleImageUpload(event) {
-            const files = event.target.files;
-            if (files.length === 0) return;
-            previewArea.innerHTML = '';
-            uploadedImages = [];
-            const activateButtons = () => {
-                downloadBtn.disabled = false;
-                downloadBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                uploadDriveBtn.disabled = false;
-                uploadDriveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            };
-            Array.from(files).forEach(file => {
+        function handleImageUpload(event, append = false) {
+            // Copiar archivos a array inmediatamente antes de cualquier otra operación
+            const filesArray = Array.from(event.target.files);
+            if (filesArray.length === 0) return;
+
+            // Resetear el input DESPUÉS de copiar, así se puede volver a seleccionar los mismos archivos
+            setTimeout(() => { event.target.value = ''; }, 100);
+
+            // Si no es append, limpiar todo
+            if (!append) {
+                previewArea.innerHTML = '';
+                uploadedImages = [];
+            } else {
+                const placeholder = previewArea.querySelector('.col-span-full');
+                if (placeholder) placeholder.remove();
+            }
+
+            const startIndex = uploadedImages.length;
+            const total = filesArray.length;
+            let loaded = 0;
+
+            const progressContainer = document.getElementById('uploadProgressContainer');
+            const progressBar = document.getElementById('uploadProgressBar');
+            const progressText = document.getElementById('uploadProgressText');
+            const progressCurrentFile = document.getElementById('uploadCurrentFile');
+
+            progressContainer.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            progressText.textContent = `0 / ${total}`;
+            progressCurrentFile.textContent = 'Preparando...';
+
+            // Crear skeletons al final del grid
+            const newSkeletons = [];
+            filesArray.forEach(() => {
+                const skeleton = document.createElement('div');
+                skeleton.className = 'photo-skeleton';
+                previewArea.appendChild(skeleton);
+                newSkeletons.push(skeleton);
+            });
+
+            function onImageReady(localIndex, img, fileName) {
+                loaded++;
+                const pct = Math.round((loaded / total) * 100);
+                progressBar.style.width = `${pct}%`;
+                progressText.textContent = `${loaded} / ${total}`;
+                progressCurrentFile.textContent = loaded < total
+                    ? `Procesando: ${filesArray[loaded]?.name || ''}`
+                    : '✅ ¡Fotos agregadas!';
+
+                const globalIndex = startIndex + localIndex;
+                uploadedImages[globalIndex] = { name: fileName, imgElement: img };
+
+                const globalIdxForBtn = startIndex + localIndex;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'canvas-wrapper';
+                wrapper.dataset.globalIndex = globalIdxForBtn;
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const btnDel = document.createElement('button');
+                btnDel.className = 'btn-delete-photo';
+                btnDel.title = 'Eliminar foto';
+                btnDel.innerHTML = '&times;';
+                btnDel.addEventListener('click', () => deletePhoto(wrapper));
+                wrapper.appendChild(canvas);
+                wrapper.appendChild(btnDel);
+                newSkeletons[localIndex].replaceWith(wrapper);
+                drawWatermark(canvas, img);
+
+                if (loaded === total) {
+                    downloadBtn.disabled = false;
+                    downloadBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    uploadDriveBtn.disabled = false;
+                    uploadDriveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    document.getElementById('addMoreBtn').classList.remove('hidden');
+                    setTimeout(() => {
+                        progressContainer.classList.add('hidden');
+                    }, 2000);
+                }
+            }
+
+            filesArray.forEach((file, localIndex) => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
+                    progressCurrentFile.textContent = `Leyendo: ${file.name}`;
                     const img = new Image();
-                    img.onload = () => {
-                        uploadedImages.push({ name: file.name, imgElement: img });
-                        createImageCanvas(img);
-                        activateButtons();
+                    img.onload = () => onImageReady(localIndex, img, file.name);
+                    img.onerror = () => {
+                        // Si falla una imagen, igual contar como procesada
+                        progressCurrentFile.textContent = `⚠️ No se pudo cargar: ${file.name}`;
+                        onImageReady(localIndex, new Image(), file.name);
                     };
                     img.src = e.target.result;
+                };
+                reader.onerror = () => {
+                    progressCurrentFile.textContent = `⚠️ Error leyendo: ${file.name}`;
+                    loaded++;
+                    const pct = Math.round((loaded / total) * 100);
+                    progressBar.style.width = `${pct}%`;
+                    progressText.textContent = `${loaded} / ${total}`;
+                    newSkeletons[localIndex].remove();
+                    if (loaded === total) {
+                        progressContainer.classList.add('hidden');
+                    }
                 };
                 reader.readAsDataURL(file);
             });
         }
 
-        function createImageCanvas(img) {
+        function createImageCanvas(img, globalIndex) {
             const wrapper = document.createElement('div');
             wrapper.className = 'canvas-wrapper';
+            wrapper.dataset.globalIndex = globalIndex;
             const canvas = document.createElement('canvas');
             canvas.width = img.width;
             canvas.height = img.height;
+            const btnDel = document.createElement('button');
+            btnDel.className = 'btn-delete-photo';
+            btnDel.title = 'Eliminar foto';
+            btnDel.innerHTML = '&times;';
+            btnDel.addEventListener('click', () => deletePhoto(wrapper));
             wrapper.appendChild(canvas);
+            wrapper.appendChild(btnDel);
             previewArea.appendChild(wrapper);
             drawWatermark(canvas, img);
+        }
+
+        function deletePhoto(wrapper) {
+            const idx = parseInt(wrapper.dataset.globalIndex);
+            // Remove from uploadedImages
+            uploadedImages.splice(idx, 1);
+            wrapper.remove();
+            // Re-index remaining wrappers
+            const allWrappers = previewArea.querySelectorAll('.canvas-wrapper');
+            allWrappers.forEach((w, i) => { w.dataset.globalIndex = i; });
+            // Disable buttons if no photos left
+            if (uploadedImages.length === 0) {
+                downloadBtn.disabled = true;
+                downloadBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                uploadDriveBtn.disabled = true;
+                uploadDriveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                document.getElementById('addMoreBtn').classList.add('hidden');
+                previewArea.innerHTML = '<div class="col-span-full text-center py-20 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">Cargue imágenes para visualizar la marca de agua.</div>';
+            }
         }
 
         function wrapText(ctx, text, x, y, maxWidth, lineHeight, baseSize) {
@@ -504,27 +1036,7 @@
 
         // ── Lógica de propuesta de nuevo título ──────────────────────────────
 
-        // Guarda el texto al enfocar para comparar al salir
-        let _tituloAlEnfocar = "";
-        tituloManualInput.addEventListener('focus', () => {
-            _tituloAlEnfocar = tituloManualInput.value.trim();
-        });
-
-        tituloManualInput.addEventListener('blur', () => {
-            const textoActual = tituloManualInput.value.trim();
-            const esp = document.getElementById('especialidadSelect').value;
-
-            // Solo actuar si hay especialidad seleccionada, el texto cambió y no está vacío
-            if (!esp || !textoActual || textoActual === _tituloAlEnfocar) return;
-
-            // Verificar si ya existe en el catálogo actual
-            const tema = temaSelect.value;
-            const titulosExistentes = (dataCatalogo[tema] && dataCatalogo[tema].titles) ? dataCatalogo[tema].titles : [];
-            const yaExiste = titulosExistentes.some(t => t.trim().toLowerCase() === textoActual.toLowerCase());
-            if (yaExiste) return;
-
-            abrirModalPropuesta(textoActual, esp);
-        });
+        // El modal de propuesta ahora se abre manualmente desde el panel de catálogo
 
         function abrirModalPropuesta(titulo, especialidad) {
             document.getElementById('modalTituloPreview').textContent = `"${titulo}"`;
@@ -609,22 +1121,598 @@
 
         // ── Fin lógica de propuesta ───────────────────────────────────────────
 
+        // ── Fin lógica de propuesta ───────────────────────────────────────────
+
+        // ═══════════════════════════════════════════════════════════════════
+        // CATÁLOGO PERSONAL — 100% localStorage
+        //   Clave: "catalogoPersonal_EM" / "catalogoPersonal_Civil"
+        //   Valor: JSON del objeto dataCatalogo { tema: { options:{}, titles:[] } }
+        //   El catálogo de GitHub NUNCA se sobreescribe automáticamente.
+        //   El usuario lo edita aquí, se guarda localmente, y puede:
+        //     - Descargarlo como .txt
+        //     - Importarlo desde .txt
+        //     - Sugerirlo al admin via GitHub PR (botón explícito)
+        // ═══════════════════════════════════════════════════════════════════
+
+        let editorCatalogo = {};
+        let editorEspActual = 'EM';
+
+        const lsKey = esp => `catalogoPersonal_${esp}`;
+
+        function catalogoGuardado(esp) {
+            try { const v = localStorage.getItem(lsKey(esp)); return v ? JSON.parse(v) : null; }
+            catch { return null; }
+        }
+
+        function guardarCatalogoLocal() {
+            localStorage.setItem(lsKey(editorEspActual), JSON.stringify(editorCatalogo));
+            // Update header status
+            const statusEl = document.getElementById('catalogHeaderStatus');
+            if (statusEl) {
+                const temas = Object.keys(editorCatalogo);
+                const totalTitulos = Object.values(editorCatalogo).reduce((a,v) => a + (v.titles||[]).length, 0);
+                const espLabel = editorEspActual === 'EM' ? 'Electromecánico' : 'Civil';
+                statusEl.textContent = `${espLabel} · ${temas.length} temas · ${totalTitulos} títulos`;
+            }
+        }
+
+        // ── Parser .txt → objeto ────────────────────────────────────────
+        function parseCatalogText(content) {
+            const lines = content.split(/\r?\n/);
+            let currentTema = null;
+            const result = {};
+            lines.forEach(raw => {
+                const line = raw.trim();
+                if (!line) return;
+                const temaMatch = line.match(/^<(.+)>$/);
+                if (temaMatch) {
+                    currentTema = temaMatch[1];
+                    result[currentTema] = { options: {}, titles: [] };
+                    return;
+                }
+                if (!currentTema) return;
+                const optMatch = line.match(/^(\d+)<(.+)>$/);
+                if (optMatch) {
+                    const lvl = optMatch[1];
+                    if (!result[currentTema].options[lvl]) result[currentTema].options[lvl] = [];
+                    result[currentTema].options[lvl].push(optMatch[2]);
+                } else {
+                    result[currentTema].titles.push(line);
+                }
+            });
+            return result;
+        }
+
+        // ── Objeto → texto .txt ─────────────────────────────────────────
+        function catalogToTxt(cat) {
+            let out = "";
+            for (const [tema, config] of Object.entries(cat)) {
+                out += `<${tema}>\n`;
+                if (config.options) {
+                    Object.keys(config.options).sort().forEach(lvl => {
+                        config.options[lvl].forEach(o => { out += `${lvl}<${o}>\n`; });
+                    });
+                }
+                (config.titles || []).forEach(t => { out += `${t}\n`; });
+                out += "\n";
+            }
+            return out;
+        }
+
+        // ── Mostrar/ocultar panel + auto-aplicar si existe ─────────────
+        function renderCatalogPanel(autoApply = false) {
+            const empty = document.getElementById('catalogEmpty');
+            const editor = document.getElementById('catalogEditor');
+            const statusEl = document.getElementById('catalogHeaderStatus');
+            const saved = catalogoGuardado(editorEspActual);
+
+            if (saved !== null) {
+                editorCatalogo = JSON.parse(JSON.stringify(saved));
+                empty.classList.add('hidden');
+                editor.classList.remove('hidden');
+                // Make sure body is visible if it was open
+                const body = document.getElementById('catalogBody');
+                if (_catalogBodyOpen) body.classList.remove('hidden');
+
+                const temas = Object.keys(editorCatalogo);
+                const totalTitulos = Object.values(editorCatalogo).reduce((a,v) => a + (v.titles||[]).length, 0);
+                const espLabel = editorEspActual === 'EM' ? 'Electromecánico' : 'Civil';
+                statusEl.textContent = `${espLabel} · ${temas.length} temas · ${totalTitulos} títulos`;
+
+                editorPopulateTemas();
+
+                // AUTO-APPLY: si hay especialidad activa y coincide, aplicar sin botón
+                if (autoApply) {
+                    const espApp = document.getElementById('especialidadSelect').value;
+                    if (espApp && espApp === editorEspActual) {
+                        dataCatalogo = JSON.parse(JSON.stringify(editorCatalogo));
+                        populateTemas();
+                        selectionsContainer.classList.remove('hidden');
+                    }
+                }
+            } else {
+                editorCatalogo = {};
+                empty.classList.remove('hidden');
+                editor.classList.add('hidden');
+                const espLabel = editorEspActual === 'EM' ? 'Electromecánico' : 'Civil';
+                statusEl.textContent = `Sin catálogo para ${espLabel}`;
+            }
+        }
+
+        // ── Toggle colapsar/expandir cuerpo del catálogo ────────────────
+        let _catalogBodyOpen = false;
+        function toggleCatalogEditor() {
+            const body = document.getElementById('catalogBody');
+            const chevron = document.getElementById('catalogChevron');
+            _catalogBodyOpen = !_catalogBodyOpen;
+            body.classList.toggle('hidden', !_catalogBodyOpen);
+            chevron.style.transform = _catalogBodyOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+        }
+
+        // ── Iniciar desde GitHub ────────────────────────────────────────
+        async function initCatalogFromGithub() {
+            const esp = editorEspActual;
+            const loading = document.getElementById('catalogInitLoading');
+            loading.classList.remove('hidden');
+            try {
+                const res = await fetch(URLS_CATALOGO[esp] + "?t=" + Date.now());
+                if (!res.ok) throw new Error("No se pudo obtener el archivo");
+                const text = await res.text();
+                editorCatalogo = parseCatalogText(text);
+                guardarCatalogoLocal();
+                document.getElementById('catalogEmpty').classList.add('hidden');
+                document.getElementById('catalogEditor').classList.remove('hidden');
+                document.getElementById('catalogBody').classList.remove('hidden');
+                _catalogBodyOpen = true;
+                document.getElementById('catalogChevron').style.transform = 'rotate(180deg)';
+                editorPopulateTemas();
+            } catch(e) {
+                alert("Error al copiar desde GitHub: " + e.message);
+            } finally {
+                loading.classList.add('hidden');
+            }
+        }
+
+        // ── Iniciar desde cero ──────────────────────────────────────────
+        function initCatalogEmpty() {
+            editorCatalogo = {};
+            guardarCatalogoLocal();
+            document.getElementById('catalogEmpty').classList.add('hidden');
+            document.getElementById('catalogEditor').classList.remove('hidden');
+                        editorPopulateTemas();
+        }
+
+        // ── Importar .txt ───────────────────────────────────────────────
+        function catalogImportarTxt(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                editorCatalogo = parseCatalogText(e.target.result);
+                guardarCatalogoLocal();
+                document.getElementById('catalogEmpty').classList.add('hidden');
+                document.getElementById('catalogEditor').classList.remove('hidden');
+                document.getElementById('catalogBody').classList.remove('hidden');
+                _catalogBodyOpen = true;
+                document.getElementById('catalogChevron').style.transform = 'rotate(180deg)';
+                editorPopulateTemas();
+            };
+            reader.readAsText(file);
+            input.value = '';
+        }
+
+        // ── Descargar como .txt ─────────────────────────────────────────
+        function catalogDescargarTxt() {
+            const txt = catalogToTxt(editorCatalogo);
+            const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Catalogo${editorEspActual}_personalizado.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ── Cargar .txt (alias para input file oculto) ──────────────────
+        function catalogCargarTxt() {
+            document.getElementById('catalogTxtImportInput').click();
+        }
+
+        // ── Borrar catálogo local ───────────────────────────────────────
+        function catalogBorrarLocal() {
+            const label = editorEspActual === 'EM' ? 'Electromecánico' : 'Civil';
+            if (!confirm(`¿Borrar el catálogo guardado para ${label}? Esta acción no se puede deshacer.`)) return;
+            localStorage.removeItem(lsKey(editorEspActual));
+            editorCatalogo = {};
+            document.getElementById('catalogEditor').classList.add('hidden');
+            document.getElementById('catalogEmpty').classList.remove('hidden');
+                    }
+
+        // ── Menú contextual ─────────────────────────────────────────────
+        function toggleCatalogMenu() {
+            document.getElementById('catalogMenu').classList.toggle('hidden');
+        }
+        document.addEventListener('click', e => {
+            if (!document.getElementById('catalogMenuWrapper').contains(e.target)) {
+                document.getElementById('catalogMenu').classList.add('hidden');
+            }
+        });
+
+        // ── Cambiar especialidad en el editor ───────────────────────────
+        function editorSwitchEsp() {
+            editorEspActual = document.getElementById('editorEspSelect').value;
+            renderCatalogPanel();
+        }
+
+        // ── Poblar select de temas ──────────────────────────────────────
+        function editorPopulateTemas() {
+            const sel = document.getElementById('editorTemaSelect');
+            const temas = Object.keys(editorCatalogo);
+            sel.innerHTML = temas.length === 0
+                ? '<option value="">— sin temas —</option>'
+                : temas.map(t => `<option value="${t}">${t}</option>`).join('');
+            editorLoadTema();
+        }
+
+        // ── Cargar contenido del tema seleccionado ──────────────────────
+        function editorLoadTema() {
+            const tema = document.getElementById('editorTemaSelect').value;
+            const optsContainer = document.getElementById('editorOpcionesContainer');
+            const titulosList = document.getElementById('editorTitulosList');
+            const count = document.getElementById('editorTitulosCount');
+
+            optsContainer.innerHTML = '';
+            titulosList.innerHTML = '';
+            count.textContent = '';
+
+            if (!tema || !editorCatalogo[tema]) return;
+
+            const config = editorCatalogo[tema];
+
+            // Opciones de nivel — renderizar como grupos con nombre
+            if (config.options && Object.keys(config.options).length > 0) {
+                Object.keys(config.options).sort().forEach(lvl => {
+                    // Nombre legible del grupo (guardado en config.optionLabels si existe)
+                    const labelGrupo = (config.optionLabels && config.optionLabels[lvl]) || `Grupo ${lvl}`;
+                    const group = document.createElement('div');
+                    group.className = 'bg-white border border-purple-100 rounded-lg p-2 space-y-1';
+                    // Header del grupo
+                    const header = document.createElement('div');
+                    header.className = 'flex items-center gap-1 mb-1';
+                    header.innerHTML = `
+                        <input type="text" value="${labelGrupo.replace(/"/g,'&quot;')}"
+                            class="flex-1 text-xs font-semibold text-purple-700 border-0 border-b border-purple-200 bg-transparent px-1 py-0.5 focus:outline-none focus:border-purple-500 min-w-0"
+                            placeholder="Nombre del grupo..."
+                            onchange="editorRenombrarGrupo('${tema}','${lvl}',this.value)">
+                        <button onclick="editorAgregarItemEnGrupo('${tema}','${lvl}')" title="Agregar opción"
+                            class="shrink-0 w-5 h-5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded text-sm font-bold flex items-center justify-center">+</button>
+                        <button onclick="editorEliminarGrupo('${tema}','${lvl}')" title="Eliminar grupo"
+                            class="shrink-0 w-5 h-5 bg-red-50 hover:bg-red-100 text-red-400 rounded text-sm font-bold flex items-center justify-center">×</button>`;
+                    group.appendChild(header);
+                    // Items del grupo
+                    config.options[lvl].forEach((opt, idx) => {
+                        const row = document.createElement('div');
+                        row.className = 'flex gap-1 items-center pl-1';
+                        row.innerHTML = `
+                            <span class="text-purple-300 text-xs shrink-0">•</span>
+                            <input type="text" value="${opt.replace(/"/g,'&quot;')}"
+                                class="flex-1 text-xs border rounded px-2 py-1 focus:border-purple-400 focus:outline-none min-w-0"
+                                onchange="editorUpdateOpcion('${tema}','${lvl}',${idx},this.value)">
+                            <button onclick="editorEliminarOpcion('${tema}','${lvl}',${idx})"
+                                class="shrink-0 text-red-300 hover:text-red-600 px-1 text-base leading-none">×</button>`;
+                        group.appendChild(row);
+                    });
+                    optsContainer.appendChild(group);
+                });
+            }
+
+            // Títulos
+            count.textContent = `${config.titles.length}`;
+            config.titles.forEach((t, i) => {
+                const row = document.createElement('div');
+                row.className = 'flex gap-1 items-start group';
+                row.innerHTML = `
+                    <input type="text" value="${t.replace(/"/g,'&quot;')}"
+                        class="flex-1 text-xs border rounded px-2 py-1 focus:border-purple-400 focus:outline-none min-w-0"
+                        onchange="editorUpdateTitulo('${tema}',${i},this.value)">
+                    <button onclick="editorEliminarTitulo('${tema}',${i})"
+                        class="shrink-0 mt-0.5 text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity px-1 text-base leading-none">×</button>`;
+                titulosList.appendChild(row);
+            });
+        }
+
+        // ── Opciones de nivel: gestión de grupos ───────────────────────
+        function editorAgregarGrupoOpcion() {
+            const tema = document.getElementById('editorTemaSelect').value;
+            if (!tema || !editorCatalogo[tema]) { alert('Selecciona un tema primero.'); return; }
+            // Auto-determinar siguiente número de nivel disponible
+            const existing = Object.keys(editorCatalogo[tema].options || {}).map(Number);
+            const nextLvl = String((existing.length > 0 ? Math.max(...existing) : 0) + 1);
+            if (!editorCatalogo[tema].options) editorCatalogo[tema].options = {};
+            editorCatalogo[tema].options[nextLvl] = [];
+            if (!editorCatalogo[tema].optionLabels) editorCatalogo[tema].optionLabels = {};
+            editorCatalogo[tema].optionLabels[nextLvl] = `Grupo ${nextLvl}`;
+            guardarCatalogoLocal();
+            editorLoadTema();
+        }
+
+        function editorRenombrarGrupo(tema, lvl, nuevoNombre) {
+            if (!editorCatalogo[tema].optionLabels) editorCatalogo[tema].optionLabels = {};
+            editorCatalogo[tema].optionLabels[lvl] = nuevoNombre.trim() || `Grupo ${lvl}`;
+            guardarCatalogoLocal();
+        }
+
+        function editorEliminarGrupo(tema, lvl) {
+            if (!confirm(`¿Eliminar el grupo "${(editorCatalogo[tema].optionLabels||{})[lvl] || lvl}" con todas sus opciones?`)) return;
+            delete editorCatalogo[tema].options[lvl];
+            if (editorCatalogo[tema].optionLabels) delete editorCatalogo[tema].optionLabels[lvl];
+            guardarCatalogoLocal();
+            editorLoadTema();
+        }
+
+        function editorAgregarItemEnGrupo(tema, lvl) {
+            if (!editorCatalogo[tema].options[lvl]) editorCatalogo[tema].options[lvl] = [];
+            editorCatalogo[tema].options[lvl].push('');
+            guardarCatalogoLocal();
+            editorLoadTema();
+            // Focus último input del grupo
+            setTimeout(() => {
+                const containers = document.getElementById('editorOpcionesContainer');
+                const inputs = containers.querySelectorAll('input[type="text"]');
+                // Find last non-header input for this group
+                const allInputs = Array.from(inputs);
+                if (allInputs.length) allInputs[allInputs.length - 1].focus();
+            }, 60);
+        }
+
+        function editorAgregarOpcion() { editorAgregarGrupoOpcion(); } // alias
+
+        function editorUpdateOpcion(tema, lvl, idx, val) {
+            editorCatalogo[tema].options[lvl][idx] = val;
+            guardarCatalogoLocal();
+        }
+
+        function editorEliminarOpcion(tema, lvl, idx) {
+            editorCatalogo[tema].options[lvl].splice(idx, 1);
+            if (editorCatalogo[tema].options[lvl].length === 0) delete editorCatalogo[tema].options[lvl];
+            guardarCatalogoLocal();
+            editorLoadTema();
+        }
+
+        // ── CRUD títulos ────────────────────────────────────────────────
+        function editorUpdateTitulo(tema, i, val) {
+            editorCatalogo[tema].titles[i] = val;
+            guardarCatalogoLocal();
+        }
+
+        function editorEliminarTitulo(tema, i) {
+            editorCatalogo[tema].titles.splice(i, 1);
+            guardarCatalogoLocal();
+            editorLoadTema();
+        }
+
+        function editorAgregarTitulo() {
+            const input = document.getElementById('editorNuevoTitulo');
+            const val = input.value.trim();
+            const tema = document.getElementById('editorTemaSelect').value;
+            if (!val) return;
+            if (!tema) { alert('Crea un tema primero.'); return; }
+            editorCatalogo[tema].titles.push(val);
+            input.value = '';
+            guardarCatalogoLocal();
+            editorLoadTema();
+            setTimeout(() => {
+                const list = document.getElementById('editorTitulosList');
+                list.scrollTop = list.scrollHeight;
+            }, 40);
+        }
+
+        // ── CRUD temas ──────────────────────────────────────────────────
+        function editorNuevoTema() {
+            const nombre = prompt('Nombre del nuevo tema:');
+            if (!nombre || !nombre.trim()) return;
+            const key = nombre.trim();
+            if (editorCatalogo[key]) { alert('Ese tema ya existe.'); return; }
+            editorCatalogo[key] = { options: {}, titles: [] };
+            guardarCatalogoLocal();
+            editorPopulateTemas();
+            document.getElementById('editorTemaSelect').value = key;
+            editorLoadTema();
+        }
+
+        function editorRenombrarTema() {
+            const tema = document.getElementById('editorTemaSelect').value;
+            if (!tema) return;
+            const nuevo = prompt('Nuevo nombre para el tema:', tema);
+            if (!nuevo || !nuevo.trim() || nuevo.trim() === tema) return;
+            const key = nuevo.trim();
+            if (editorCatalogo[key]) { alert('Ya existe un tema con ese nombre.'); return; }
+            // Reconstruct preserving order
+            const newCat = {};
+            for (const [t, v] of Object.entries(editorCatalogo)) {
+                newCat[t === tema ? key : t] = v;
+            }
+            editorCatalogo = newCat;
+            guardarCatalogoLocal();
+            editorPopulateTemas();
+            document.getElementById('editorTemaSelect').value = key;
+            editorLoadTema();
+        }
+
+        function editorEliminarTema() {
+            const tema = document.getElementById('editorTemaSelect').value;
+            if (!tema) return;
+            if (!confirm(`¿Eliminar el tema "${tema}" con todos sus títulos?`)) return;
+            delete editorCatalogo[tema];
+            guardarCatalogoLocal();
+            editorPopulateTemas();
+        }
+
+        // ── Usar catálogo en la app principal ───────────────────────────
+        function catalogUsarEnApp() {
+            const espApp = document.getElementById('especialidadSelect').value;
+            if (!espApp) {
+                alert('Selecciona primero una especialidad en el panel "Selección de Actividad".');
+                return;
+            }
+            if (espApp !== editorEspActual) {
+                const label = editorEspActual === 'EM' ? 'Electromecánico' : 'Civil';
+                const labelApp = espApp === 'EM' ? 'Electromecánico' : 'Civil';
+                alert(`El editor muestra el catálogo de "${label}", pero la app tiene "${labelApp}" seleccionado. Pon la misma especialidad en ambos.`);
+                return;
+            }
+            dataCatalogo = JSON.parse(JSON.stringify(editorCatalogo));
+            populateTemas();
+            selectionsContainer.classList.remove('hidden');
+            const btn = document.getElementById('btnUsarCatalogo');
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> ¡Aplicado!';
+            btn.classList.replace('bg-purple-600','bg-green-600');
+            btn.classList.replace('hover:bg-purple-700','hover:bg-green-700');
+            setTimeout(() => {
+                btn.innerHTML = orig;
+                btn.classList.replace('bg-green-600','bg-purple-600');
+                btn.classList.replace('hover:bg-green-700','hover:bg-purple-700');
+            }, 2000);
+        }
+
+        // ── Sugerir catálogo al admin via GitHub PR ─────────────────────
+        function abrirModalPropuestaDesdeEditor() {
+            const esp = editorEspActual;
+            if (Object.keys(editorCatalogo).length === 0) {
+                alert('El catálogo está vacío, no hay nada que sugerir.');
+                return;
+            }
+            const contenido = catalogToTxt(editorCatalogo);
+            const temas = Object.keys(editorCatalogo).length;
+            const total = Object.values(editorCatalogo).reduce((a,v) => a + (v.titles||[]).length, 0);
+            document.getElementById('modalTituloPreview').textContent =
+                `Catálogo personalizado: ${temas} tema${temas!==1?'s':''}, ${total} título${total!==1?'s':''}`;
+            document.getElementById('modalEspecialidadLabel').textContent =
+                esp === "EM" ? "Electromecánico" : "Civil";
+            document.getElementById('modalEstado').classList.add('hidden');
+            document.getElementById('modalEstado').textContent = '';
+            document.getElementById('modalBtnText').textContent = 'Sí, enviar sugerencia';
+            document.getElementById('modalSpinner').classList.add('hidden');
+            document.getElementById('modalEnviarBtn').disabled = false;
+            document.getElementById('modalCancelBtn').disabled = false;
+            window._propuestaOverride = {
+                archivo: esp === "EM" ? "TitulosEM.txt" : "TitulosCivil.txt",
+                contenido
+            };
+            document.getElementById('modalPropuesta').classList.remove('hidden');
+        }
+
+        // ── Patch enviarPropuesta para soportar override ─────────────────
+        const _enviarPropuestaOrig = enviarPropuesta;
+        async function enviarPropuesta() {
+            if (!window._propuestaOverride) return _enviarPropuestaOrig();
+            const { archivo, contenido } = window._propuestaOverride;
+            window._propuestaOverride = null;
+            document.getElementById('modalBtnText').textContent = 'Enviando...';
+            document.getElementById('modalSpinner').classList.remove('hidden');
+            document.getElementById('modalEnviarBtn').disabled = true;
+            document.getElementById('modalCancelBtn').disabled = true;
+            try {
+                const res = await fetch(WORKER_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ archivo, contenido })
+                });
+                const data = await res.json();
+                const el = document.getElementById('modalEstado');
+                el.classList.remove('hidden');
+                if (data.ok) {
+                    el.className = "mb-4 text-sm font-medium text-center py-2 rounded-lg bg-green-100 text-green-700";
+                    el.innerHTML = `✅ Sugerencia enviada. <a href="${data.prUrl}" target="_blank" class="underline font-bold">Ver PR</a>`;
+                    document.getElementById('modalBtnText').textContent = 'Enviado';
+                    setTimeout(cerrarModalPropuesta, 4000);
+                } else { throw new Error(data.error || "Error desconocido"); }
+            } catch(err) {
+                const el = document.getElementById('modalEstado');
+                el.classList.remove('hidden');
+                el.className = "mb-4 text-sm font-medium text-center py-2 rounded-lg bg-red-100 text-red-700";
+                el.textContent = `❌ ${err.message}`;
+                document.getElementById('modalBtnText').textContent = 'Reintentar';
+                document.getElementById('modalSpinner').classList.add('hidden');
+                document.getElementById('modalEnviarBtn').disabled = false;
+                document.getElementById('modalCancelBtn').disabled = false;
+            }
+        }
+
+        // ── Sincronizar especialidad + auto-aplicar catálogo ───────────
+        // Prioridad: Drive del proyecto > localStorage personal > GitHub
+        const _switchEspOrig = switchEspecialidad;
+        async function switchEspecialidad() {
+            const esp = document.getElementById('especialidadSelect').value;
+            if (!esp) { await _switchEspOrig(); return; }
+
+            selectionsContainer.classList.add('hidden');
+            fileUploadContainer.classList.remove('hidden');
+            loadingCatalog.classList.add('hidden');
+
+            const { fuente, data } = getCatalogoParaEsp(esp);
+
+            if (fuente === "drive" && data) {
+                // Catálogo del proyecto en Drive
+                dataCatalogo = parseCatalogText(data);
+                populateTemas();
+                selectionsContainer.classList.remove('hidden');
+
+            } else if (fuente === "local" && data) {
+                // Catálogo local del usuario
+                dataCatalogo = JSON.parse(JSON.stringify(data));
+                populateTemas();
+                selectionsContainer.classList.remove('hidden');
+
+            } else {
+                // Fallback: cargar desde GitHub
+                await _switchEspOrig();
+            }
+
+            editorEspActual = esp;
+            document.getElementById('editorEspSelect').value = esp;
+            renderCatalogPanel(true);
+        }
+
+        // ── Arranque: mostrar estado inicial del panel ───────────────────
+        window.addEventListener('load', () => {
+            const today = new Date().toISOString().split('T')[0];
+            // fechaInput already set in original onload — just render catalog
+            renderCatalogPanel(false); // no auto-apply on load (no specialty selected yet)
+        });
+
+
         async function uploadToDrive() {
             const canvases = document.querySelectorAll('canvas');
             if (canvases.length === 0) return;
 
             const btn = document.getElementById('uploadDriveBtn');
-            btn.innerText = "Subiendo... ⏳";
             btn.disabled = true;
+            btn.classList.add('opacity-75');
 
+            const driveContainer = document.getElementById('driveProgressContainer');
+            const driveBar = document.getElementById('driveProgressBar');
+            const driveText = document.getElementById('driveProgressText');
+            const driveCurrent = document.getElementById('driveCurrentFile');
+
+            const total = canvases.length;
             let successCount = 0;
+            let errorCount = 0;
 
-            for (let i = 0; i < canvases.length; i++) {
+            driveContainer.classList.remove('hidden');
+            driveBar.style.width = '0%';
+            driveText.textContent = `0 / ${total}`;
+            driveCurrent.textContent = 'Preparando archivos...';
+
+            for (let i = 0; i < total; i++) {
                 const canvas = canvases[i];
-                const fullBase64 = canvas.toDataURL('image/jpeg', 0.8);
                 const fileName = generateCustomFileName(i);
 
+                driveCurrent.textContent = `Subiendo: ${fileName.substring(0, 60)}...`;
+
                 try {
+                    const fullBase64 = canvas.toDataURL('image/jpeg', 0.8);
                     await fetch(SCRIPT_URL, {
                         method: 'POST',
                         mode: 'no-cors',
@@ -635,14 +1723,35 @@
                         })
                     });
                     successCount++;
-                } catch (error) { 
-                    console.error("Error en subida:", error); 
+                } catch (error) {
+                    console.error("Error en subida:", error);
+                    errorCount++;
                 }
+
+                const pct = Math.round(((i + 1) / total) * 100);
+                driveBar.style.width = `${pct}%`;
+                driveText.textContent = `${i + 1} / ${total}`;
             }
 
-            alert(`Proceso finalizado. Se han enviado ${successCount} fotos a Google Drive.`);
-            btn.innerText = "Subir a Google Drive";
+            if (errorCount === 0) {
+                driveCurrent.textContent = `✅ ¡${successCount} foto${successCount !== 1 ? 's' : ''} subida${successCount !== 1 ? 's' : ''} a Google Drive!`;
+                driveBar.classList.remove('bg-indigo-600');
+                driveBar.classList.add('bg-green-500');
+            } else {
+                driveCurrent.textContent = `⚠️ ${successCount} subidas correctamente, ${errorCount} con error.`;
+                driveBar.classList.remove('bg-indigo-600');
+                driveBar.classList.add('bg-yellow-500');
+            }
+
             btn.disabled = false;
+            btn.classList.remove('opacity-75');
+
+            setTimeout(() => {
+                driveContainer.classList.add('hidden');
+                driveBar.classList.remove('bg-green-500', 'bg-yellow-500');
+                driveBar.classList.add('bg-indigo-600');
+                driveBar.style.width = '0%';
+            }, 4000);
         }
     </script>
 </body>
