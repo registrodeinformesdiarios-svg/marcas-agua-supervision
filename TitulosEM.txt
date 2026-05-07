@@ -100,6 +100,7 @@ Revisión de controles de bahías
 Protecciones diferenciales
 Instalación de medidores en búnker
 Integración de esquemas PCyM
+Mediciones para fibra óptica
 
 <13.Pruebas Eléctricas y Dieléctricas>
 Resistencia de aislamiento
