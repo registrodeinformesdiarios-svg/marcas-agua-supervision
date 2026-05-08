@@ -551,8 +551,9 @@
         const fileUploadContainer = document.getElementById('fileUploadContainer');
         const loadingCatalog = document.getElementById('loadingCatalog');
 
-        let dataCatalogo = {}; 
+        let dataCatalogo = {};
         let uploadedImages = [];
+        const uploadedFileNames = new Set();
 
         window.onload = () => {
             const today = new Date().toISOString().split('T')[0];
@@ -1990,10 +1991,21 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             const statusEl = card.querySelector('.job-status');
             const dismissBtn = card.querySelector('.job-dismiss');
 
-            let successCount = 0, errorCount = 0;
+            let successCount = 0, errorCount = 0, skippedCount = 0;
 
             for (let i = 0; i < total; i++) {
                 const { fileName, base64 } = jobPhotos[i];
+
+                if (uploadedFileNames.has(fileName)) {
+                    skippedCount++;
+                    successCount++;
+                    statusEl.textContent = `Omitida (ya subida): ${fileName.substring(0, 45)}...`;
+                    const pct = Math.round(((i + 1) / total) * 100);
+                    bar.style.width = `${pct}%`;
+                    countEl.textContent = `${i + 1} / ${total}`;
+                    continue;
+                }
+
                 statusEl.textContent = `Subiendo: ${fileName.substring(0, 55)}...`;
                 try {
                     await fetch(SCRIPT_URL, {
@@ -2001,6 +2013,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                         mode: 'no-cors',
                         body: JSON.stringify({ base64, type: 'image/jpeg', name: fileName })
                     });
+                    uploadedFileNames.add(fileName);
                     successCount++;
                 } catch(e) {
                     errorCount++;
@@ -2010,13 +2023,20 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 countEl.textContent = `${i + 1} / ${total}`;
             }
 
+            const nuevasSubidas = successCount - skippedCount;
             if (errorCount === 0) {
-                statusEl.textContent = `✅ ${successCount} foto${successCount !== 1 ? 's' : ''} subida${successCount !== 1 ? 's' : ''} a Drive`;
+                if (skippedCount > 0 && nuevasSubidas === 0) {
+                    statusEl.textContent = `✅ Todas las fotos ya estaban en Drive (${skippedCount})`;
+                } else if (skippedCount > 0) {
+                    statusEl.textContent = `✅ ${nuevasSubidas} nueva${nuevasSubidas !== 1 ? 's' : ''} subida${nuevasSubidas !== 1 ? 's' : ''}, ${skippedCount} ya estaban en Drive`;
+                } else {
+                    statusEl.textContent = `✅ ${successCount} foto${successCount !== 1 ? 's' : ''} subida${successCount !== 1 ? 's' : ''} a Drive`;
+                }
                 bar.classList.remove('bg-indigo-500');
                 bar.classList.add('bg-green-500');
-                if (successCount > 0) await agregarTituloAlCatalogo();
+                if (nuevasSubidas > 0) await agregarTituloAlCatalogo();
             } else {
-                statusEl.textContent = `⚠️ ${successCount} subidas, ${errorCount} con error`;
+                statusEl.textContent = `⚠️ ${nuevasSubidas} subidas, ${errorCount} con error`;
                 bar.classList.remove('bg-indigo-500');
                 bar.classList.add('bg-yellow-500');
             }
