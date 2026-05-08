@@ -113,6 +113,13 @@
             transform: translateX(-50%) translateY(0);
             opacity: 1;
         }
+
+        #tituloManualInput.titulo-modificado {
+            border-color: #ef4444 !important;
+            color: #dc2626;
+            background-color: #fff5f5;
+            box-shadow: 0 0 0 2px rgba(239,68,68,0.15);
+        }
     </style>
 </head>
 
@@ -379,7 +386,7 @@
                                 <textarea id="tituloManualInput" rows="2"
                                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                                     placeholder="Escribe o edita el título aquí..."
-                                    oninput="updateAllCanvas()"></textarea>
+                                    oninput="onTituloInput()"></textarea>
                             </div>
                         </div>
                     </div>
@@ -420,7 +427,7 @@
                         class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg opacity-50 cursor-not-allowed transition-all" disabled>
                         Subir a Google Drive
                     </button>
-
+                    <p id="driveNuevoTituloHint" class="hidden text-xs text-center text-red-600 font-medium mt-1 leading-snug px-1"></p>
 
                 </div>
             </div>
@@ -825,6 +832,33 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
         function syncTituloInput() {
             tituloManualInput.value = tituloSelect.value;
             updateAllCanvas();
+            checkTituloModificado();
+        }
+
+        function onTituloInput() {
+            updateAllCanvas();
+            checkTituloModificado();
+        }
+
+        function checkTituloModificado() {
+            const valorActual = tituloManualInput.value.trim();
+            const valorCatalogo = tituloSelect.value.trim();
+            const modificado = valorActual !== '' && valorActual !== valorCatalogo;
+
+            if (modificado) {
+                tituloManualInput.classList.add('titulo-modificado');
+            } else {
+                tituloManualInput.classList.remove('titulo-modificado');
+            }
+
+            const hint = document.getElementById('driveNuevoTituloHint');
+            if (modificado) {
+                const preview = valorActual.length > 45 ? valorActual.substring(0, 45) + '…' : valorActual;
+                hint.textContent = `Al cargar, "${preview}" se agregará al catálogo.`;
+                hint.classList.remove('hidden');
+            } else {
+                hint.classList.add('hidden');
+            }
         }
 
         function handleImageUpload(event, append = false) {
@@ -1742,6 +1776,57 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
         });
 
 
+        async function agregarTituloAlCatalogo() {
+            const titulo = tituloManualInput.value.trim();
+            const tema = temaSelect.value;
+            const esp = document.getElementById('especialidadSelect').value;
+            if (!titulo || !tema || !esp) return;
+            // Si el título ya estaba en el catálogo, no hacer nada
+            if (titulo === tituloSelect.value.trim()) return;
+
+            // 1. Agregar a dataCatalogo (catálogo activo en memoria)
+            if (dataCatalogo[tema]) {
+                const yaExiste = dataCatalogo[tema].titles.some(t => t.trim().toLowerCase() === titulo.toLowerCase());
+                if (!yaExiste) {
+                    dataCatalogo[tema].titles.push(titulo);
+                    const opt = document.createElement('option');
+                    opt.value = titulo;
+                    opt.textContent = titulo;
+                    tituloSelect.appendChild(opt);
+                    tituloSelect.value = titulo;
+                }
+            }
+
+            // 2. Agregar al catálogo personal (editorCatalogo) y guardar en localStorage
+            if (esp === editorEspActual) {
+                if (!editorCatalogo[tema]) editorCatalogo[tema] = { options: {}, titles: [] };
+                const yaExisteEd = editorCatalogo[tema].titles.some(t => t.trim().toLowerCase() === titulo.toLowerCase());
+                if (!yaExisteEd) {
+                    editorCatalogo[tema].titles.push(titulo);
+                    guardarCatalogoLocal();
+                    editorLoadTema();
+                }
+            }
+
+            // 3. Si hay proyecto activo, actualizar el catálogo en Drive silenciosamente
+            if (PROYECTO_PARAM && CATALOG_SCRIPT_URL) {
+                try {
+                    const contenido = catalogToTxt(dataCatalogo);
+                    await fetch(CATALOG_SCRIPT_URL, {
+                        method: "POST",
+                        mode: "no-cors",
+                        body: JSON.stringify({ action: "update", proyecto: PROYECTO_PARAM, esp, contenido })
+                    });
+                    _catalogosDrive[esp] = contenido;
+                } catch(e) {
+                    console.warn("No se pudo actualizar catálogo en Drive:", e);
+                }
+            }
+
+            // 4. Limpiar estado rojo (el título ya es parte del catálogo)
+            checkTituloModificado();
+        }
+
         async function uploadToDrive() {
             const canvases = document.querySelectorAll('canvas');
             if (canvases.length === 0) return;
@@ -1801,6 +1886,8 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 driveBar.classList.remove('bg-indigo-600');
                 driveBar.classList.add('bg-yellow-500');
             }
+
+            if (successCount > 0) await agregarTituloAlCatalogo();
 
             btn.disabled = false;
             btn.classList.remove('opacity-75');
