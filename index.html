@@ -120,6 +120,25 @@
             background-color: #fff5f5;
             box-shadow: 0 0 0 2px rgba(239,68,68,0.15);
         }
+
+        #dropOverlay {
+            display: none;
+            position: fixed;
+            inset: 0.75rem;
+            z-index: 200;
+            background: rgba(37,99,235,0.07);
+            border: 3px dashed #3b82f6;
+            border-radius: 1.25rem;
+            pointer-events: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 0.75rem;
+            backdrop-filter: blur(1px);
+        }
+        #dropOverlay.activo {
+            display: flex;
+        }
     </style>
 </head>
 
@@ -450,27 +469,8 @@
                     <p id="uploadCurrentFile" class="mt-2 text-xs text-blue-600 truncate">Iniciando...</p>
                 </div>
 
-                <!-- Barra de progreso de subida a Drive -->
-                <div id="driveProgressContainer" class="hidden mb-4 bg-indigo-50 border border-indigo-100 rounded-lg p-4">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-sm font-semibold text-indigo-800 flex items-center gap-2">
-                            <svg class="w-4 h-4 shrink-0" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3L28.6 48H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066DA"/>
-                                <path d="M43.65 25L29.25 0c-1.35.8-2.5 1.9-3.3 3.3L1.2 43.5C.4 44.9 0 46.45 0 48h28.6z" fill="#00AC47"/>
-                                <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75L86.1 56.5c.8-1.4 1.2-2.95 1.2-4.5H58.7l6.1 11.4z" fill="#EA4335"/>
-                                <path d="M43.65 25L58.05 0H29.25z" fill="#00832D"/>
-                                <path d="M58.7 48l-15-26H28.6l15 26z" fill="#2684FC"/>
-                                <path d="M73.55 76.8L58.7 48H28.6l14.85 25.7 1.2 2.1c.8-.05 1.6-.2 2.35-.5z" fill="#FFBA00"/>
-                            </svg>
-                            Subiendo a Google Drive...
-                        </span>
-                        <span id="driveProgressText" class="text-sm font-bold text-indigo-700">0 / 0</span>
-                    </div>
-                    <div class="w-full bg-indigo-200 rounded-full h-3 overflow-hidden">
-                        <div id="driveProgressBar" class="bg-indigo-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
-                    </div>
-                    <p id="driveCurrentFile" class="mt-2 text-xs text-indigo-600 truncate">Preparando archivos...</p>
-                </div>
+                <!-- Cola de subidas a Drive (dinámica, soporta múltiples trabajos) -->
+                <div id="driveJobsContainer" class="hidden mb-4 space-y-2"></div>
 
                 <div id="previewArea" class="preview-container custom-scrollbar max-h-screen overflow-y-auto pr-2">
                     <div class="col-span-full text-center py-20 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">
@@ -511,6 +511,15 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <!-- Overlay drag & drop -->
+    <div id="dropOverlay">
+        <svg class="w-16 h-16 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        <p class="text-blue-600 text-xl font-bold">Suelta las fotos aquí</p>
+        <p id="dropOverlaySubtitle" class="text-blue-400 text-sm font-medium"></p>
     </div>
 
     <script>
@@ -1924,78 +1933,138 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             checkTituloModificado();
         }
 
+        function crearTarjetaSubida(jobId, titulo, fecha, total) {
+            const container = document.getElementById('driveJobsContainer');
+            container.classList.remove('hidden');
+            const partes = fecha.split('-');
+            const fechaDisplay = partes.length === 3 ? `${partes[2]}-${partes[1]}-${partes[0]}` : fecha;
+            const tituloCorto = titulo.length > 38 ? titulo.substring(0, 36) + '…' : titulo;
+            const card = document.createElement('div');
+            card.id = jobId;
+            card.className = 'bg-indigo-50 border border-indigo-200 rounded-lg p-3 transition-opacity duration-500';
+            card.innerHTML = `
+                <div class="flex items-center justify-between gap-2 mb-1.5">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                        <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3L28.6 48H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066DA"/>
+                            <path d="M43.65 25L29.25 0c-1.35.8-2.5 1.9-3.3 3.3L1.2 43.5C.4 44.9 0 46.45 0 48h28.6z" fill="#00AC47"/>
+                            <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75L86.1 56.5c.8-1.4 1.2-2.95 1.2-4.5H58.7l6.1 11.4z" fill="#EA4335"/>
+                            <path d="M43.65 25L58.05 0H29.25z" fill="#00832D"/>
+                            <path d="M58.7 48l-15-26H28.6l15 26z" fill="#2684FC"/>
+                            <path d="M73.55 76.8L58.7 48H28.6l14.85 25.7 1.2 2.1c.8-.05 1.6-.2 2.35-.5z" fill="#FFBA00"/>
+                        </svg>
+                        <span class="text-xs font-bold text-indigo-800 truncate">${tituloCorto}</span>
+                        <span class="text-xs text-indigo-400 shrink-0">· ${fechaDisplay} · ${total} foto${total !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="job-count text-xs font-bold text-indigo-600">0 / ${total}</span>
+                        <button class="job-dismiss hidden text-indigo-300 hover:text-indigo-600 text-lg leading-none font-bold px-0.5"
+                            onclick="const c=document.getElementById('driveJobsContainer');this.closest('.bg-indigo-50').remove();if(!c.children.length)c.classList.add('hidden');">×</button>
+                    </div>
+                </div>
+                <div class="w-full bg-indigo-200 rounded-full h-2 overflow-hidden">
+                    <div class="job-bar bg-indigo-500 h-2 rounded-full transition-all duration-200" style="width:0%"></div>
+                </div>
+                <p class="job-status mt-1 text-xs text-indigo-500 truncate">Preparando...</p>`;
+            container.appendChild(card);
+            return card;
+        }
+
         async function uploadToDrive() {
-            const canvases = document.querySelectorAll('canvas');
+            const canvases = Array.from(document.querySelectorAll('canvas'));
             if (canvases.length === 0) return;
 
-            const btn = document.getElementById('uploadDriveBtn');
-            btn.disabled = true;
-            btn.classList.add('opacity-75');
+            // Snapshot inmediato: nombre de archivo + datos — independiente de cambios futuros en UI
+            const jobPhotos = canvases.map((canvas, i) => ({
+                fileName: generateCustomFileName(i),
+                base64: canvas.toDataURL('image/jpeg', 0.8)
+            }));
+            const jobTitulo = tituloManualInput.value.trim() || 'Sin título';
+            const jobFecha = fechaInput.value;
+            const jobId = 'job_' + Date.now();
+            const total = jobPhotos.length;
 
-            const driveContainer = document.getElementById('driveProgressContainer');
-            const driveBar = document.getElementById('driveProgressBar');
-            const driveText = document.getElementById('driveProgressText');
-            const driveCurrent = document.getElementById('driveCurrentFile');
+            const card = crearTarjetaSubida(jobId, jobTitulo, jobFecha, total);
+            const bar = card.querySelector('.job-bar');
+            const countEl = card.querySelector('.job-count');
+            const statusEl = card.querySelector('.job-status');
+            const dismissBtn = card.querySelector('.job-dismiss');
 
-            const total = canvases.length;
-            let successCount = 0;
-            let errorCount = 0;
-
-            driveContainer.classList.remove('hidden');
-            driveBar.style.width = '0%';
-            driveText.textContent = `0 / ${total}`;
-            driveCurrent.textContent = 'Preparando archivos...';
+            let successCount = 0, errorCount = 0;
 
             for (let i = 0; i < total; i++) {
-                const canvas = canvases[i];
-                const fileName = generateCustomFileName(i);
-
-                driveCurrent.textContent = `Subiendo: ${fileName.substring(0, 60)}...`;
-
+                const { fileName, base64 } = jobPhotos[i];
+                statusEl.textContent = `Subiendo: ${fileName.substring(0, 55)}...`;
                 try {
-                    const fullBase64 = canvas.toDataURL('image/jpeg', 0.8);
                     await fetch(SCRIPT_URL, {
                         method: 'POST',
                         mode: 'no-cors',
-                        body: JSON.stringify({
-                            base64: fullBase64,
-                            type: 'image/jpeg',
-                            name: fileName
-                        })
+                        body: JSON.stringify({ base64, type: 'image/jpeg', name: fileName })
                     });
                     successCount++;
-                } catch (error) {
-                    console.error("Error en subida:", error);
+                } catch(e) {
                     errorCount++;
                 }
-
                 const pct = Math.round(((i + 1) / total) * 100);
-                driveBar.style.width = `${pct}%`;
-                driveText.textContent = `${i + 1} / ${total}`;
+                bar.style.width = `${pct}%`;
+                countEl.textContent = `${i + 1} / ${total}`;
             }
 
             if (errorCount === 0) {
-                driveCurrent.textContent = `✅ ¡${successCount} foto${successCount !== 1 ? 's' : ''} subida${successCount !== 1 ? 's' : ''} a Google Drive!`;
-                driveBar.classList.remove('bg-indigo-600');
-                driveBar.classList.add('bg-green-500');
+                statusEl.textContent = `✅ ${successCount} foto${successCount !== 1 ? 's' : ''} subida${successCount !== 1 ? 's' : ''} a Drive`;
+                bar.classList.remove('bg-indigo-500');
+                bar.classList.add('bg-green-500');
+                if (successCount > 0) await agregarTituloAlCatalogo();
             } else {
-                driveCurrent.textContent = `⚠️ ${successCount} subidas correctamente, ${errorCount} con error.`;
-                driveBar.classList.remove('bg-indigo-600');
-                driveBar.classList.add('bg-yellow-500');
+                statusEl.textContent = `⚠️ ${successCount} subidas, ${errorCount} con error`;
+                bar.classList.remove('bg-indigo-500');
+                bar.classList.add('bg-yellow-500');
             }
 
-            if (successCount > 0) await agregarTituloAlCatalogo();
-
-            btn.disabled = false;
-            btn.classList.remove('opacity-75');
+            dismissBtn.classList.remove('hidden');
 
             setTimeout(() => {
-                driveContainer.classList.add('hidden');
-                driveBar.classList.remove('bg-green-500', 'bg-yellow-500');
-                driveBar.classList.add('bg-indigo-600');
-                driveBar.style.width = '0%';
-            }, 4000);
+                card.style.opacity = '0';
+                setTimeout(() => {
+                    card.remove();
+                    const container = document.getElementById('driveJobsContainer');
+                    if (!container.children.length) container.classList.add('hidden');
+                }, 500);
+            }, 7000);
         }
+        // ── Drag & Drop de fotos ──────────────────────────────────────────
+        (function() {
+            let dragDepth = 0;
+            const overlay = document.getElementById('dropOverlay');
+            const subtitle = document.getElementById('dropOverlaySubtitle');
+
+            document.addEventListener('dragenter', e => {
+                if (!Array.from(e.dataTransfer.types).includes('Files')) return;
+                dragDepth++;
+                subtitle.textContent = uploadedImages.length > 0
+                    ? 'Se agregarán a las fotos actuales'
+                    : 'Las fotos se cargarán aquí';
+                overlay.classList.add('activo');
+            });
+
+            document.addEventListener('dragleave', () => {
+                dragDepth--;
+                if (dragDepth <= 0) { dragDepth = 0; overlay.classList.remove('activo'); }
+            });
+
+            document.addEventListener('dragover', e => e.preventDefault());
+
+            document.addEventListener('drop', e => {
+                e.preventDefault();
+                dragDepth = 0;
+                overlay.classList.remove('activo');
+                const files = e.dataTransfer.files;
+                if (!files.length) return;
+                const append = uploadedImages.length > 0;
+                handleImageUpload({ target: { files, value: '' } }, append);
+            });
+        })();
+
     </script>
 </body>
 
