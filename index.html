@@ -334,7 +334,11 @@
                             <label class="block text-sm font-medium text-gray-700">Fecha</label>
                             <input type="date" id="fechaInput"
                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                                oninput="updateAllCanvas()">
+                                oninput="updateAllCanvas(); document.getElementById('fechaExifIndicator').classList.add('hidden');">
+                            <p id="fechaExifIndicator" class="hidden mt-1 text-xs text-blue-500 font-medium flex items-center gap-1">
+                                <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                Fecha detectada de la foto
+                            </p>
                         </div>
                     </div>
                 </section>
@@ -861,10 +865,103 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             }
         }
 
+        // ── Lector de fecha EXIF (puro JS, sin librerías) ─────────────────────
+
+        async function trySetDateFromExif(file) {
+            return new Promise(resolve => {
+                const r = new FileReader();
+                r.onload = e => resolve(extractExifDate(e.target.result));
+                r.onerror = () => resolve(null);
+                r.readAsArrayBuffer(file);
+            });
+        }
+
+        function extractExifDate(buffer) {
+            try {
+                const view = new DataView(buffer);
+                if (view.byteLength < 12 || view.getUint16(0) !== 0xFFD8) return null;
+                let offset = 2;
+                while (offset + 3 < view.byteLength) {
+                    const marker = view.getUint16(offset);
+                    if (marker === 0xFFE1) {
+                        const segLen = view.getUint16(offset + 2);
+                        // Verificar magic "Exif\0\0"
+                        if (view.getUint32(offset + 4) !== 0x45786966) { offset += 2 + segLen; continue; }
+                        const tb = offset + 10; // base TIFF
+                        const le = view.getUint16(tb) === 0x4949; // byte order
+                        if (view.getUint16(tb + 2, le) !== 0x002A) return null;
+                        const ifd0 = tb + view.getUint32(tb + 4, le);
+                        const n0 = view.getUint16(ifd0, le);
+                        let exifPtr = null, dt0132 = null;
+                        for (let i = 0; i < n0 && ifd0 + 2 + i * 12 + 12 <= view.byteLength; i++) {
+                            const ep = ifd0 + 2 + i * 12;
+                            const tag = view.getUint16(ep, le);
+                            if (tag === 0x8769) exifPtr = view.getUint32(ep + 8, le);
+                            else if (tag === 0x0132) dt0132 = _readExifStr(view, tb + view.getUint32(ep + 8, le), 19);
+                        }
+                        // Buscar DateTimeOriginal (0x9003) o DateTimeDigitized (0x9004) en SubIFD
+                        if (exifPtr !== null) {
+                            const exifPos = tb + exifPtr;
+                            const nE = view.getUint16(exifPos, le);
+                            for (let i = 0; i < nE && exifPos + 2 + i * 12 + 12 <= view.byteLength; i++) {
+                                const ep = exifPos + 2 + i * 12;
+                                const tag = view.getUint16(ep, le);
+                                if (tag === 0x9003 || tag === 0x9004) {
+                                    const d = _parseExifDateStr(_readExifStr(view, tb + view.getUint32(ep + 8, le), 19));
+                                    if (d) return d;
+                                }
+                            }
+                        }
+                        // Fallback: DateTime del IFD0
+                        return dt0132 ? _parseExifDateStr(dt0132) : null;
+                    } else if ((marker & 0xFF00) === 0xFF00) {
+                        offset += 2 + view.getUint16(offset + 2);
+                    } else break;
+                }
+                return null;
+            } catch(e) { return null; }
+        }
+
+        function _readExifStr(view, offset, maxLen) {
+            let s = '';
+            for (let i = 0; i < maxLen && offset + i < view.byteLength; i++) {
+                const b = view.getUint8(offset + i);
+                if (b === 0) break;
+                s += String.fromCharCode(b);
+            }
+            return s;
+        }
+
+        function _parseExifDateStr(str) {
+            const m = str && str.match(/^(\d{4}):(\d{2}):(\d{2})/);
+            if (!m) return null;
+            const [, y, mo, d] = m;
+            if (+y < 1900 || +y > 2100 || +mo < 1 || +mo > 12 || +d < 1 || +d > 31) return null;
+            return `${y}-${mo}-${d}`;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+
         function handleImageUpload(event, append = false) {
             // Copiar archivos a array inmediatamente antes de cualquier otra operación
             const filesArray = Array.from(event.target.files);
             if (filesArray.length === 0) return;
+
+            // Auto-detectar fecha EXIF de la primera foto (solo en carga nueva)
+            if (!append) {
+                trySetDateFromExif(filesArray[0]).then(date => {
+                    if (date) {
+                        fechaInput.value = date;
+                        updateAllCanvas();
+                        const ind = document.getElementById('fechaExifIndicator');
+                        if (ind) {
+                            ind.classList.remove('hidden');
+                            clearTimeout(window._exifIndTimer);
+                            window._exifIndTimer = setTimeout(() => ind.classList.add('hidden'), 6000);
+                        }
+                    }
+                });
+            }
 
             // Resetear el input DESPUÉS de copiar, así se puede volver a seleccionar los mismos archivos
             setTimeout(() => { event.target.value = ''; }, 100);
