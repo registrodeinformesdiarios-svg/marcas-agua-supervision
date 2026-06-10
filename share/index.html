@@ -1,20 +1,100 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Cargando...</title>
+  <meta name="viewport" content="width=1280">
+  <title>Cargando fotos...</title>
+  <style>
+    body { margin:0; background:#1d4ed8; display:flex; align-items:center;
+           justify-content:center; height:100vh; flex-direction:column; gap:1rem; }
+    p    { color:white; font-family:sans-serif; font-size:1.1rem; font-weight:600; margin:0; }
+    .spinner { width:40px; height:40px; border:4px solid rgba(255,255,255,0.3);
+               border-top-color:white; border-radius:50%; animation:spin 0.8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+  </style>
 </head>
 <body>
-  <!-- 
-    Este archivo existe solo para que GitHub Pages devuelva HTTP 200
-    cuando el sistema operativo hace el POST del Share Target.
-    El Service Worker intercepta esa petición antes de que llegue aquí,
-    procesa las fotos y redirige a la app principal.
-    Si por algún motivo el SW no interceptó, este script redirige manualmente.
-  -->
+  <div class="spinner"></div>
+  <p id="msg">Recibiendo fotos...</p>
+
   <script>
-    // Fallback: si el SW no interceptó el POST, redirigir a la app
-    window.location.replace('/marcas-agua-supervision/');
+  (async () => {
+    const msg = document.getElementById('msg');
+
+    // La Web Share Target API con GET pasa los archivos como
+    // objetos File reales en el objeto global `window.launchQueue`
+    // (Launch Handler API) — disponible en Chrome 102+ Android.
+    // También los expone via `navigator.share` no aplica aquí.
+    //
+    // Con GET + files, Chrome los pone disponibles via launchQueue:
+    if ('launchQueue' in window) {
+      window.launchQueue.setConsumer(async (launchParams) => {
+        if (!launchParams.files || launchParams.files.length === 0) {
+          redirigir();
+          return;
+        }
+
+        msg.textContent = `Procesando ${launchParams.files.length} foto(s)...`;
+
+        try {
+          const shareCache = await caches.open('share-target-queue');
+
+          // Obtener el proyecto desde el parámetro de la URL
+          // (el SO preserva los query params al abrir la app)
+          const proyecto = new URLSearchParams(window.location.search).get('proyecto') || '';
+
+          const files = [];
+          for (const fileHandle of launchParams.files) {
+            const file = await fileHandle.getFile();
+            files.push(file);
+          }
+
+          // Guardar en caché para que la app principal las lea
+          await shareCache.put(
+            new Request('/_share-queue'),
+            new Response(JSON.stringify({ count: files.length, proyecto }), {
+              headers: { 'Content-Type': 'application/json' }
+            })
+          );
+
+          for (let i = 0; i < files.length; i++) {
+            const buf = await files[i].arrayBuffer();
+            await shareCache.put(
+              new Request('/_share-image-' + i),
+              new Response(buf, {
+                headers: {
+                  'Content-Type': files[i].type || 'image/jpeg',
+                  'X-File-Name':  files[i].name || ('foto_' + i + '.jpg')
+                }
+              })
+            );
+          }
+
+          msg.textContent = `${files.length} foto(s) listas. Abriendo app...`;
+          redirigir(proyecto);
+
+        } catch(e) {
+          console.error('Error procesando fotos:', e);
+          redirigir();
+        }
+      });
+
+      // Si launchQueue no dispara en 3s, redirigir igual
+      setTimeout(redirigir, 3000);
+
+    } else {
+      // Navegador sin soporte launchQueue — redirigir a la app
+      // (el usuario tendrá que cargar las fotos manualmente)
+      redirigir();
+    }
+
+    function redirigir(proyecto) {
+      const base    = '/marcas-agua-supervision/';
+      const proy    = proyecto || new URLSearchParams(window.location.search).get('proyecto') || '';
+      const destino = base + '?from=share' + (proy ? '&proyecto=' + encodeURIComponent(proy) : '');
+      window.location.replace(destino);
+    }
+  })();
   </script>
 </body>
 </html>
