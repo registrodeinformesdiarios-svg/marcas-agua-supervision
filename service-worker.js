@@ -1,41 +1,56 @@
-// service-worker.js — Versión 9.0
-// Base: versión funcional original (POST a raíz)
-// Agregado: proyecto persistido en Cache para sobrevivir reinicios del SW
+// service-worker.js — Versión 10.0
+// - action del share_target siempre fija en /share-handler (diferente de start_url)
+// - El SW la sirve directamente desde caché, sin tocar GitHub Pages
+// - proyecto persistido en Cache API para sobrevivir reinicios del SW
 
-const CACHE_NAME     = 'marcador-fotos-v9';
-const PROYECTO_KEY   = '/_sw-proyecto-activo';
-const BASE_SCOPE     = '/marcas-agua-supervision/';
+const CACHE_NAME   = 'marcador-fotos-v10';
+const BASE_SCOPE   = '/marcas-agua-supervision/';
+const SHARE_ACTION = '/marcas-agua-supervision/share-handler';
+const PROYECTO_KEY = '/_sw-proyecto-activo';
 
-// Variable en memoria — se restaura desde caché al despertar
 let proyectoActivo = '';
 
-// ── Al despertar, restaurar el proyecto guardado ──────────────────────────
+// ── Persistencia del proyecto ─────────────────────────────────────────────
 async function restaurarProyecto() {
   try {
     const c   = await caches.open(CACHE_NAME);
     const res = await c.match(PROYECTO_KEY);
-    if (res) proyectoActivo = await res.text();
+    if (res) proyectoActivo = (await res.text()).trim();
   } catch(e) {}
 }
 
-// ── Guardar proyecto en caché (persiste aunque el SW se duerma) ───────────
-async function persistirProyecto(proyecto) {
-  proyectoActivo = proyecto;
+async function persistirProyecto(p) {
+  proyectoActivo = p;
   try {
     const c = await caches.open(CACHE_NAME);
-    await c.put(PROYECTO_KEY, new Response(proyecto, {
-      headers: { 'Content-Type': 'text/plain' }
-    }));
+    await c.put(PROYECTO_KEY,
+      new Response(p, { headers: { 'Content-Type': 'text/plain' } })
+    );
   } catch(e) {}
 }
+
+// ── HTML mínimo que el SW sirve para la action del share target ───────────
+// GitHub Pages nunca ve esta URL — el SW la intercepta siempre
+const SHARE_HANDLER_HTML = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>...</title></head>
+<body><script>window.location.replace('/marcas-agua-supervision/');<\/script></body>
+</html>`;
 
 // ── Instalación ────────────────────────────────────────────────────────────
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache =>
-      cache.addAll([BASE_SCOPE, BASE_SCOPE + 'index.html']).catch(() => {})
-    )
+    caches.open(CACHE_NAME).then(async cache => {
+      // Pre-cachear el shell y la URL de la action
+      await cache.addAll([BASE_SCOPE, BASE_SCOPE + 'index.html']).catch(() => {});
+      // Cachear el share-handler para que el SW siempre pueda responder a esa URL
+      await cache.put(
+        new Request(SHARE_ACTION),
+        new Response(SHARE_HANDLER_HTML, {
+          headers: { 'Content-Type': 'text/html' }
+        })
+      );
+    })
   );
 });
 
@@ -43,10 +58,11 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+        keys.filter(k => k !== CACHE_NAME && k !== 'share-target-queue')
+            .map(k => caches.delete(k))
       ))
       .then(() => self.clients.claim())
-      .then(() => restaurarProyecto())   // restaurar proyecto al activar
+      .then(() => restaurarProyecto())
   );
 });
 
@@ -69,26 +85,29 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 2. Share Target POST a la raíz
-  if (event.request.method === 'POST' && url.pathname === BASE_SCOPE) {
+  // 2. Share Target POST — interceptado SIEMPRE por el SW (está en caché)
+  if (event.request.method === 'POST' && url.pathname === SHARE_ACTION) {
     event.respondWith(
       restaurarProyecto().then(() => handleShareTarget(event.request, url))
     );
     return;
   }
 
-  // 3. Red primero, caché como fallback
+  // 3. share-handler GET (por si el SO hace un GET de prueba)
+  if (url.pathname === SHARE_ACTION) {
+    event.respondWith(caches.match(SHARE_ACTION));
+    return;
+  }
+
+  // 4. Red primero, caché como fallback
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );
 });
 
-// ── Manifest dinámico ─────────────────────────────────────────────────────
+// ── Manifest dinámico ──────────────────────────────────────────────────────
 function servirManifestDinamico(request) {
-  // proyectoActivo ya fue restaurado antes de llamar esta función
   let proyecto = proyectoActivo;
-
-  // Respaldo: leer del Referer si aún no hay proyecto en memoria
   if (!proyecto) {
     const referer = request.referrer || request.headers.get('Referer') || '';
     if (referer) {
@@ -116,7 +135,7 @@ function servirManifestDinamico(request) {
       { src: BASE_SCOPE + 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
     ],
     share_target: {
-      action:  BASE_SCOPE,
+      action:  SHARE_ACTION,   // fija, diferente de start_url, servida por el SW
       method:  'POST',
       enctype: 'multipart/form-data',
       params:  { files: [{ name: 'images', accept: ['image/*'] }] }
@@ -128,7 +147,7 @@ function servirManifestDinamico(request) {
   });
 }
 
-// ── Share Target: recibir fotos ───────────────────────────────────────────
+// ── Procesar fotos compartidas ─────────────────────────────────────────────
 async function handleShareTarget(request, url) {
   let files = [];
   try {
@@ -138,7 +157,6 @@ async function handleShareTarget(request, url) {
     console.warn('[SW] Error leyendo formData:', e);
   }
 
-  // proyectoActivo ya fue restaurado desde caché antes de llegar aquí
   const proyecto = proyectoActivo || url.searchParams.get('proyecto') || '';
 
   if (files.length > 0) {
@@ -164,6 +182,7 @@ async function handleShareTarget(request, url) {
       );
     }
 
+    // Si la app ya tiene una ventana abierta, notificarla
     const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     if (clients.length > 0) {
       await clients[0].focus();
