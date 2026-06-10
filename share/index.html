@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Cargando...</title>
+</head>
+<body>
+  <!-- 
+    Este archivo existe solo para que GitHub Pages devuelva HTTP 200
+    cuando el sistema operativo hace el POST del Share Target.
+    El Service Worker intercepta esa petición antes de que llegue aquí,
+    procesa las fotos y redirige a la app principal.
+    Si por algún motivo el SW no interceptó, este script redirige manualmente.
+  -->
+  <script>
+    // Fallback: si el SW no interceptó el POST, redirigir a la app
+    window.location.replace('/marcas-agua-supervision/');
+  </script>
+</body>
+</html>
