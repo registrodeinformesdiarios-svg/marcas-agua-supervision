@@ -2117,7 +2117,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
          Requiere: manifest.json + service-worker.js en la raíz del repo.
          ═══════════════════════════════════════════════════════════════════ -->
     <script>
-      // ── 1. Registrar el Service Worker ────────────────────────────────
+      // ── 1. Registrar el Service Worker y enviarle el proyecto actual ───
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', async () => {
           try {
@@ -2126,6 +2126,32 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
               { scope: '/marcas-agua-supervision/' }
             );
             console.log('[SW] Registrado:', reg.scope);
+
+            // Enviar el ?proyecto= al SW para que lo use al servir manifest.json.
+            // Funciona tanto si el SW acaba de instalarse como si ya estaba activo.
+            const proyecto = new URLSearchParams(window.location.search).get('proyecto') || '';
+            const swTarget = reg.active || reg.waiting || reg.installing;
+
+            function enviarProyecto(sw) {
+              sw.postMessage({ type: 'SET_PROYECTO', proyecto });
+            }
+
+            if (swTarget && swTarget.state === 'activated') {
+              enviarProyecto(swTarget);
+            } else {
+              // Esperar a que el SW se active (primera instalación)
+              navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (navigator.serviceWorker.controller) {
+                  navigator.serviceWorker.controller.postMessage({ type: 'SET_PROYECTO', proyecto });
+                }
+              });
+              // También intentarlo cuando el SW en installing/waiting llegue a activated
+              if (swTarget) {
+                swTarget.addEventListener('statechange', function() {
+                  if (this.state === 'activated') enviarProyecto(this);
+                });
+              }
+            }
           } catch (err) {
             console.warn('[SW] Error al registrar:', err);
           }
