@@ -6,62 +6,26 @@
     <!-- Vista de escritorio forzada: la app siempre se renderiza a 1280px sin importar el dispositivo -->
     <meta name="viewport" content="width=1280">
     <title>Generador de Marcas de Agua - PS Tecales</title>
-    <!-- PWA: manifest dinámico (incluye ?proyecto= en start_url y en el nombre de la app) -->
+    <!-- PWA: manifest estático — el SW lo intercepta y devuelve JSON dinámico con ?proyecto= -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1d4ed8">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <!-- iOS: nombre del ícono y título se inyectan dinámicamente según ?proyecto= -->
     <script>
       (function() {
-        const BASE_SCOPE = '/marcas-agua-supervision/';
-        const params     = new URLSearchParams(window.location.search);
-        const proyecto   = params.get('proyecto') || '';
+        const proyecto = new URLSearchParams(window.location.search).get('proyecto') || '';
+        const shortName = proyecto || 'Marcador Fotos';
 
-        const appName    = proyecto ? `Fotos · ${proyecto}` : 'Marcador de Fotos';
-        const shortName  = proyecto ? proyecto               : 'Marcador Fotos';
-        const startUrl   = proyecto
-          ? BASE_SCOPE + '?proyecto=' + encodeURIComponent(proyecto)
-          : BASE_SCOPE;
+        // Nombre del ícono en iOS (apple-mobile-web-app-title)
+        const metaTitle = document.createElement('meta');
+        metaTitle.name    = 'apple-mobile-web-app-title';
+        metaTitle.content = shortName;
+        document.head.appendChild(metaTitle);
 
-        const manifest = {
-          name:             appName,
-          short_name:       shortName,
-          description:      'Generador de marcas de agua para reportes de obra PS Tecales',
-          start_url:        startUrl,
-          scope:            BASE_SCOPE,
-          display:          'standalone',
-          background_color: '#f3f4f6',
-          theme_color:      '#1d4ed8',
-          icons: [
-            { src: BASE_SCOPE + 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-            { src: BASE_SCOPE + 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
-          ],
-          share_target: {
-            action:   startUrl,
-            method:   'POST',
-            enctype:  'multipart/form-data',
-            params:   { files: [{ name: 'images', accept: ['image/*'] }] }
-          }
-        };
-
-        const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
-        const url  = URL.createObjectURL(blob);
-
-        const link = document.createElement('link');
-        link.rel   = 'manifest';
-        link.href  = url;
-        document.head.appendChild(link);
-
-        // iOS no lee el manifest — hay que setear estos metas manualmente
-        const setMeta = (name, content) => {
-          const m = document.createElement('meta');
-          m.name = name; m.content = content;
-          document.head.appendChild(m);
-        };
-        setMeta('apple-mobile-web-app-title',        shortName);
-        setMeta('apple-mobile-web-app-capable',      'yes');
-        setMeta('apple-mobile-web-app-status-bar-style', 'default');
-        setMeta('mobile-web-app-capable',            'yes');
-        setMeta('theme-color',                       '#1d4ed8');
-
-        // Actualizar el <title> de la pestaña también
-        if (proyecto) document.title = `${proyecto} · Marcador de Fotos`;
+        // Título de la pestaña
+        if (proyecto) document.title = proyecto + ' · Marcador de Fotos';
       })();
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
