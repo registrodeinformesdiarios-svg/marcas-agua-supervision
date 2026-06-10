@@ -4,6 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1d4ed8">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Marcador Fotos">
+    
     <title>Generador de Marcas de Agua - PS Tecales</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Toast catálogo Drive -->
@@ -2086,6 +2093,90 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
         })();
 
     </script>
+
+    <script>
+  // ── 1. Registrar el Service Worker ──────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+      try {
+        const reg = await navigator.serviceWorker.register(
+          '/marcas-agua-supervision/service-worker.js',
+          { scope: '/marcas-agua-supervision/' }
+        );
+        console.log('[SW] Registrado:', reg.scope);
+      } catch (err) {
+        console.warn('[SW] Error al registrar:', err);
+      }
+    });
+  }
+
+  // ── 2. Leer fotos de la cola Share Target ────────────────────────────
+  //    Se activa si la app fue abierta via ?from=share
+  //    o si el SW envía un postMessage con las fotos
+  async function leerColasShareTarget() {
+    if (!('caches' in window)) return;
+
+    try {
+      const shareCache = await caches.open('share-target-queue');
+      const queueRes = await shareCache.match('/_share-queue');
+      if (!queueRes) return;                              // No hay cola pendiente
+
+      const { count } = await queueRes.json();
+      if (!count || count === 0) return;
+
+      const files = [];
+      for (let i = 0; i < count; i++) {
+        const imgRes = await shareCache.match(`/_share-image-${i}`);
+        if (!imgRes) continue;
+
+        const blob = await imgRes.blob();
+        const name = imgRes.headers.get('X-File-Name') || `foto_compartida_${i}.jpg`;
+        const file = new File([blob], name, { type: blob.type || 'image/jpeg' });
+        files.push(file);
+      }
+
+      // Limpiar la cola para que no se reprocese
+      await shareCache.delete('/_share-queue');
+      for (let i = 0; i < count; i++) {
+        await shareCache.delete(`/_share-image-${i}`);
+      }
+
+      if (files.length === 0) return;
+
+      // Pequeño delay para asegurarse que el DOM y catálogos estén listos
+      await new Promise(r => setTimeout(r, 600));
+
+      // Llamar la función de carga de imágenes ya existente en la app
+      // (la misma que usa el input[type=file])
+      const fakeEvent = { target: { files: files, value: '' } };
+      const append = uploadedImages && uploadedImages.length > 0;
+      handleImageUpload(fakeEvent, append);
+
+      console.log(`[ShareTarget] ${files.length} foto(s) cargadas desde galería`);
+    } catch (err) {
+      console.warn('[ShareTarget] Error al leer cola:', err);
+    }
+  }
+
+  // ── 3. Disparar lectura de cola ──────────────────────────────────────
+  //    a) Si la URL tiene ?from=share (app fue abierta por Share Target)
+  //    b) O si el SW envía postMessage (app ya estaba abierta)
+  if (new URLSearchParams(window.location.search).has('from')) {
+    // Esperar a que window.onload termine (catálogo, etc.) antes de cargar fotos
+    if (document.readyState === 'complete') {
+      leerColasShareTarget();
+    } else {
+      window.addEventListener('load', () => setTimeout(leerColasShareTarget, 300));
+    }
+  }
+
+  navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data?.type === 'SHARE_TARGET_FILES') {
+      setTimeout(leerColasShareTarget, 400);
+    }
+  });
+</script>
+            
 </body>
 
 </html>
