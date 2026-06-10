@@ -2194,22 +2194,20 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
       }
 
       // ── 3. Disparar lectura según cómo se abrió la app ────────────────
-      const _fromShare = new URLSearchParams(window.location.search).has('from');
+      const _urlParams  = new URLSearchParams(window.location.search);
+      const _fromShare  = _urlParams.get('from') === 'share';
 
-      // a) Vía ?from=share (redirigido desde share/index.html)
+      // a) Vía ?from=share — esperar a que la app esté completamente lista
       if (_fromShare) {
-        if (document.readyState === 'complete') {
-          leerColasShareTarget();
-        } else {
-          window.addEventListener('load', () => setTimeout(leerColasShareTarget, 400));
-        }
+        // 1500ms para dar tiempo al catálogo, EXIF, y modo proyecto a cargar
+        window.addEventListener('load', () => setTimeout(leerColasShareTarget, 1500));
       }
 
       // b) Mensaje del SW (app ya estaba abierta en background)
       if (navigator.serviceWorker) {
         navigator.serviceWorker.addEventListener('message', event => {
           if (event.data?.type === 'SHARE_TARGET_FILES') {
-            setTimeout(leerColasShareTarget, 400);
+            setTimeout(leerColasShareTarget, 1500);
           }
         });
       }
