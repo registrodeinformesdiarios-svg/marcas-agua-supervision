@@ -1,24 +1,24 @@
 // service-worker.js — Share Target + manifest dinámico por proyecto
-// Versión: 5.0 — PS Tecales Marcador de Fotos
+// Versión: 6.0 — PS Tecales Marcador de Fotos
 
-const CACHE_NAME   = 'marcador-fotos-v5';
+const CACHE_NAME   = 'marcador-fotos-v6';
 const BASE_SCOPE   = '/marcas-agua-supervision/';
-const SHARE_ACTION = '/marcas-agua-supervision/share';   // URL fija del share target
+const SHARE_ACTION = '/marcas-agua-supervision/share/';
 
-// Proyecto activo guardado en memoria del SW.
-// Se actualiza via postMessage desde la página cada vez que carga.
 let proyectoActivo = '';
 
-// ── Instalación ────────────────────────────────────────────────────────────
+// ── Instalación: pre-cachear el shell + la URL del share target ───────────
 self.addEventListener('install', event => {
   self.skipWaiting();
-  // Pre-cachear el shell de la app para que el SW pueda responder
-  // a la action del share target aunque la red no esté disponible
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache =>
+      // Cachear index.html y share/index.html para que el SW pueda
+      // responder aunque GitHub Pages devuelva 404 en el POST
       cache.addAll([
         BASE_SCOPE,
-        BASE_SCOPE + 'index.html'
+        BASE_SCOPE + 'index.html',
+        BASE_SCOPE + 'share/',
+        BASE_SCOPE + 'share/index.html'
       ]).catch(() => {})
     )
   );
@@ -45,15 +45,17 @@ self.addEventListener('message', event => {
 // ── Fetch ──────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
+  const pathname = url.pathname.replace(/\/?$/, '/'); // normalizar trailing slash
 
-  // 1. Manifest dinámico — interceptar petición estática y devolver JSON al vuelo
+  // 1. Manifest dinámico
   if (url.pathname === BASE_SCOPE + 'manifest.json') {
     event.respondWith(servirManifestDinamico(event.request));
     return;
   }
 
-  // 2. Share Target POST — URL fija /share, siempre interceptada por el SW
-  if (event.request.method === 'POST' && url.pathname === SHARE_ACTION) {
+  // 2. Share Target POST — interceptar antes de que llegue a la red
+  if (event.request.method === 'POST' &&
+      (url.pathname === SHARE_ACTION || url.pathname === SHARE_ACTION.slice(0, -1))) {
     event.respondWith(handleShareTarget(event.request, url));
     return;
   }
@@ -66,8 +68,6 @@ self.addEventListener('fetch', event => {
 
 // ── Genera manifest.json dinámico con el proyecto correcto ────────────────
 function servirManifestDinamico(request) {
-  // Prioridad 1: proyecto en memoria (enviado por postMessage desde la página)
-  // Prioridad 2: Referer (respaldo)
   let proyecto = proyectoActivo;
   if (!proyecto) {
     const referer = request.referrer || request.headers.get('Referer') || '';
@@ -82,9 +82,6 @@ function servirManifestDinamico(request) {
     ? BASE_SCOPE + '?proyecto=' + encodeURIComponent(proyecto)
     : BASE_SCOPE;
 
-  // La action del share_target es SIEMPRE la URL fija /share
-  // (independiente del proyecto) para que el SW la intercepte de forma fiable.
-  // El proyecto se recupera de proyectoActivo en memoria cuando llega el POST.
   const manifest = {
     name:             appName,
     short_name:       shortName,
@@ -99,7 +96,7 @@ function servirManifestDinamico(request) {
       { src: BASE_SCOPE + 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
     ],
     share_target: {
-      action:  SHARE_ACTION,        // ← URL fija, no depende del proyecto
+      action:  SHARE_ACTION,
       method:  'POST',
       enctype: 'multipart/form-data',
       params:  { files: [{ name: 'images', accept: ['image/*'] }] }
@@ -116,14 +113,17 @@ function servirManifestDinamico(request) {
 
 // ── Recibe fotos compartidas desde la galería del sistema ──────────────────
 async function handleShareTarget(request, url) {
-  const formData = await request.formData();
-  const files    = formData.getAll('images');
+  let files = [];
+  try {
+    const formData = await request.formData();
+    files = formData.getAll('images');
+  } catch(e) {
+    console.warn('[SW] Error leyendo formData:', e);
+  }
 
-  // El proyecto viene de la memoria del SW (set por postMessage cuando la app estaba abierta)
-  // o del query string si el sistema lo incluyó
   const proyecto = proyectoActivo || url.searchParams.get('proyecto') || '';
 
-  if (files && files.length > 0) {
+  if (files.length > 0) {
     const shareCache = await caches.open('share-target-queue');
 
     await shareCache.put(
