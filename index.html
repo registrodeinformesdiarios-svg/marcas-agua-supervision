@@ -2158,14 +2158,12 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
         });
       }
 
-      // ── 2. Leer fotos de la cola Share Target ──────────────────────────
-      //    Se activa si la app fue abierta via ?from=share
-      //    o si el SW envía postMessage (app ya estaba abierta)
+      // ── 2. Cargar fotos compartidas desde la caché ─────────────────────
       async function leerColasShareTarget() {
         if (!('caches' in window)) return;
         try {
           const shareCache = await caches.open('share-target-queue');
-          const queueRes = await shareCache.match('/_share-queue');
+          const queueRes   = await shareCache.match('/_share-queue');
           if (!queueRes) return;
 
           const { count } = await queueRes.json();
@@ -2176,31 +2174,30 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             const imgRes = await shareCache.match(`/_share-image-${i}`);
             if (!imgRes) continue;
             const blob = await imgRes.blob();
-            const name = imgRes.headers.get('X-File-Name') || `foto_compartida_${i}.jpg`;
+            const name = imgRes.headers.get('X-File-Name') || `foto_${i}.jpg`;
             files.push(new File([blob], name, { type: blob.type || 'image/jpeg' }));
           }
 
-          // Limpiar la cola para que no se reprocese en la próxima visita
+          // Limpiar la cola
           await shareCache.delete('/_share-queue');
           for (let i = 0; i < count; i++) await shareCache.delete(`/_share-image-${i}`);
 
           if (files.length === 0) return;
 
-          // Esperar que el DOM y catálogos estén listos antes de cargar fotos
           await new Promise(r => setTimeout(r, 700));
-
-          // Llamar la función de carga de imágenes existente en la app
           const append = uploadedImages && uploadedImages.length > 0;
           handleImageUpload({ target: { files, value: '' } }, append);
-
-          console.log(`[ShareTarget] ${files.length} foto(s) cargadas desde galería`);
+          console.log(`[ShareTarget] ${files.length} foto(s) cargadas`);
         } catch (err) {
           console.warn('[ShareTarget] Error al leer cola:', err);
         }
       }
 
-      // ── 3. Disparar lectura de cola ────────────────────────────────────
-      if (new URLSearchParams(window.location.search).has('from')) {
+      // ── 3. Disparar lectura según cómo se abrió la app ────────────────
+      const _fromShare = new URLSearchParams(window.location.search).has('from');
+
+      // a) Vía ?from=share (redirigido desde share/index.html)
+      if (_fromShare) {
         if (document.readyState === 'complete') {
           leerColasShareTarget();
         } else {
@@ -2208,7 +2205,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
         }
       }
 
-      // Recibir mensaje del SW cuando la app ya estaba abierta
+      // b) Mensaje del SW (app ya estaba abierta en background)
       if (navigator.serviceWorker) {
         navigator.serviceWorker.addEventListener('message', event => {
           if (event.data?.type === 'SHARE_TARGET_FILES') {
