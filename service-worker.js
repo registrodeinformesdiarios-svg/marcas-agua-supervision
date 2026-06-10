@@ -1,9 +1,14 @@
 // service-worker.js — Share Target + manifest dinámico por proyecto
-// Versión: 3.0 — PS Tecales Marcador de Fotos
+// Versión: 4.0 — PS Tecales Marcador de Fotos
 
-const CACHE_NAME = 'marcador-fotos-v3';
+const CACHE_NAME = 'marcador-fotos-v4';
 const BASE_SCOPE = '/marcas-agua-supervision/';
 
+// Proyecto activo guardado en memoria del SW.
+// Se actualiza via postMessage desde la página cada vez que se carga.
+let proyectoActivo = '';
+
+// ── Instalación ────────────────────────────────────────────────────────────
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -16,39 +21,49 @@ self.addEventListener('activate', event => {
   );
 });
 
+// ── Mensajes desde la página ────────────────────────────────────────────────
+// La página envía { type: 'SET_PROYECTO', proyecto: 'Tecales' } al registrar el SW.
+// Así el SW siempre sabe qué proyecto está activo incluso en la primera carga.
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SET_PROYECTO') {
+    proyectoActivo = event.data.proyecto || '';
+    console.log('[SW] Proyecto activo:', proyectoActivo || '(ninguno)');
+  }
+});
+
+// ── Fetch ──────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // ── 1. Manifest dinámico ─────────────────────────────────────────────────
-  // El browser pide manifest.json con un header Referer que contiene la URL
-  // actual de la página (incluyendo ?proyecto=X). Lo interceptamos y
-  // devolvemos un JSON generado al vuelo con start_url y nombre correctos.
+  // 1. Manifest dinámico
   if (url.pathname === BASE_SCOPE + 'manifest.json') {
     event.respondWith(servirManifestDinamico(event.request));
     return;
   }
 
-  // ── 2. Share Target: POST con fotos desde la galería ────────────────────
+  // 2. Share Target POST
   if (event.request.method === 'POST' && url.pathname === BASE_SCOPE) {
     event.respondWith(handleShareTarget(event.request, url));
     return;
   }
 
-  // ── 3. Todo lo demás: red primero, caché como fallback ───────────────────
+  // 3. Red primero, caché como fallback
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );
 });
 
-// ── Genera y devuelve el manifest.json con el proyecto correcto ─────────────
+// ── Genera manifest.json dinámico ──────────────────────────────────────────
 function servirManifestDinamico(request) {
-  // Extraer ?proyecto= del Referer (la página que pidió el manifest)
-  let proyecto = '';
-  const referer = request.referrer || request.headers.get('Referer') || '';
-  if (referer) {
-    try {
-      proyecto = new URL(referer).searchParams.get('proyecto') || '';
-    } catch(e) {}
+  // Prioridad 1: proyecto guardado en memoria (enviado por la página via postMessage)
+  // Prioridad 2: Referer header (respaldo para el caso de primera carga)
+  let proyecto = proyectoActivo;
+
+  if (!proyecto) {
+    const referer = request.referrer || request.headers.get('Referer') || '';
+    if (referer) {
+      try { proyecto = new URL(referer).searchParams.get('proyecto') || ''; } catch(e) {}
+    }
   }
 
   const appName   = proyecto ? 'Fotos · ' + proyecto : 'Marcador de Fotos';
@@ -80,17 +95,17 @@ function servirManifestDinamico(request) {
 
   return new Response(JSON.stringify(manifest), {
     headers: {
-      'Content-Type': 'application/manifest+json',
+      'Content-Type':  'application/manifest+json',
       'Cache-Control': 'no-cache'
     }
   });
 }
 
-// ── Recibe las fotos compartidas desde la galería del sistema ───────────────
+// ── Recibe fotos compartidas desde la galería ──────────────────────────────
 async function handleShareTarget(request, url) {
   const formData = await request.formData();
   const files    = formData.getAll('images');
-  const proyecto = url.searchParams.get('proyecto') || '';
+  const proyecto = url.searchParams.get('proyecto') || proyectoActivo || '';
 
   if (files && files.length > 0) {
     const shareCache = await caches.open('share-target-queue');
@@ -116,7 +131,6 @@ async function handleShareTarget(request, url) {
       );
     }
 
-    // Notificar a ventanas ya abiertas
     const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     if (clients.length > 0) {
       await clients[0].focus();
