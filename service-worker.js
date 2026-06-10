@@ -1,12 +1,35 @@
-// service-worker.js — Versión 8.0
-// Share Target POST a la raíz (como en la versión original que funcionaba)
-// + manifest dinámico con proyecto
+// service-worker.js — Versión 9.0
+// Base: versión funcional original (POST a raíz)
+// Agregado: proyecto persistido en Cache para sobrevivir reinicios del SW
 
-const CACHE_NAME = 'marcador-fotos-v8';
-const BASE_SCOPE = '/marcas-agua-supervision/';
+const CACHE_NAME     = 'marcador-fotos-v9';
+const PROYECTO_KEY   = '/_sw-proyecto-activo';
+const BASE_SCOPE     = '/marcas-agua-supervision/';
 
+// Variable en memoria — se restaura desde caché al despertar
 let proyectoActivo = '';
 
+// ── Al despertar, restaurar el proyecto guardado ──────────────────────────
+async function restaurarProyecto() {
+  try {
+    const c   = await caches.open(CACHE_NAME);
+    const res = await c.match(PROYECTO_KEY);
+    if (res) proyectoActivo = await res.text();
+  } catch(e) {}
+}
+
+// ── Guardar proyecto en caché (persiste aunque el SW se duerma) ───────────
+async function persistirProyecto(proyecto) {
+  proyectoActivo = proyecto;
+  try {
+    const c = await caches.open(CACHE_NAME);
+    await c.put(PROYECTO_KEY, new Response(proyecto, {
+      headers: { 'Content-Type': 'text/plain' }
+    }));
+  } catch(e) {}
+}
+
+// ── Instalación ────────────────────────────────────────────────────────────
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
@@ -19,29 +42,38 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+      ))
       .then(() => self.clients.claim())
+      .then(() => restaurarProyecto())   // restaurar proyecto al activar
   );
 });
 
+// ── Mensajes desde la página ───────────────────────────────────────────────
 self.addEventListener('message', event => {
   if (event.data?.type === 'SET_PROYECTO') {
-    proyectoActivo = event.data.proyecto || '';
+    persistirProyecto(event.data.proyecto || '');
   }
 });
 
+// ── Fetch ──────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
   // 1. Manifest dinámico
   if (url.pathname === BASE_SCOPE + 'manifest.json') {
-    event.respondWith(servirManifestDinamico(event.request));
+    event.respondWith(
+      restaurarProyecto().then(() => servirManifestDinamico(event.request))
+    );
     return;
   }
 
-  // 2. Share Target POST a la raíz — igual que la versión original
+  // 2. Share Target POST a la raíz
   if (event.request.method === 'POST' && url.pathname === BASE_SCOPE) {
-    event.respondWith(handleShareTarget(event.request, url));
+    event.respondWith(
+      restaurarProyecto().then(() => handleShareTarget(event.request, url))
+    );
     return;
   }
 
@@ -51,8 +83,12 @@ self.addEventListener('fetch', event => {
   );
 });
 
+// ── Manifest dinámico ─────────────────────────────────────────────────────
 function servirManifestDinamico(request) {
+  // proyectoActivo ya fue restaurado antes de llamar esta función
   let proyecto = proyectoActivo;
+
+  // Respaldo: leer del Referer si aún no hay proyecto en memoria
   if (!proyecto) {
     const referer = request.referrer || request.headers.get('Referer') || '';
     if (referer) {
@@ -80,7 +116,7 @@ function servirManifestDinamico(request) {
       { src: BASE_SCOPE + 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
     ],
     share_target: {
-      action:  BASE_SCOPE,           // POST a la raíz, igual que la versión original
+      action:  BASE_SCOPE,
       method:  'POST',
       enctype: 'multipart/form-data',
       params:  { files: [{ name: 'images', accept: ['image/*'] }] }
@@ -92,6 +128,7 @@ function servirManifestDinamico(request) {
   });
 }
 
+// ── Share Target: recibir fotos ───────────────────────────────────────────
 async function handleShareTarget(request, url) {
   let files = [];
   try {
@@ -101,6 +138,7 @@ async function handleShareTarget(request, url) {
     console.warn('[SW] Error leyendo formData:', e);
   }
 
+  // proyectoActivo ya fue restaurado desde caché antes de llegar aquí
   const proyecto = proyectoActivo || url.searchParams.get('proyecto') || '';
 
   if (files.length > 0) {
