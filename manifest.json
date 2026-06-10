@@ -1,5 +1,5 @@
 {
-  "name": "Marcador de Fotos - PS Tecales",
+  "name": "Marcador de Fotos",
   "short_name": "Marcador Fotos",
   "description": "Generador de marcas de agua para reportes de obra PS Tecales",
   "start_url": "/marcas-agua-supervision/",
@@ -9,13 +9,13 @@
   "theme_color": "#1d4ed8",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "/marcas-agua-supervision/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-512.png",
+      "src": "/marcas-agua-supervision/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
