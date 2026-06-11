@@ -901,16 +901,18 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
 
         // ── Lector de fecha EXIF (puro JS, sin librerías) ─────────────────────
 
+        // Devuelve un objeto { date: "YYYY-MM-DD", time: "HH:MM" } o null.
+        // `time` puede ser null si el EXIF no incluye la hora.
         async function trySetDateFromExif(file) {
             return new Promise(resolve => {
                 const r = new FileReader();
-                r.onload = e => resolve(extractExifDate(e.target.result));
+                r.onload = e => resolve(extractExifDateTime(e.target.result));
                 r.onerror = () => resolve(null);
                 r.readAsArrayBuffer(file);
             });
         }
 
-        function extractExifDate(buffer) {
+        function extractExifDateTime(buffer) {
             try {
                 const view = new DataView(buffer);
                 if (view.byteLength < 12 || view.getUint16(0) !== 0xFFD8) return null;
@@ -941,13 +943,13 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                                 const ep = exifPos + 2 + i * 12;
                                 const tag = view.getUint16(ep, le);
                                 if (tag === 0x9003 || tag === 0x9004) {
-                                    const d = _parseExifDateStr(_readExifStr(view, tb + view.getUint32(ep + 8, le), 19));
+                                    const d = _parseExifDateTimeStr(_readExifStr(view, tb + view.getUint32(ep + 8, le), 19));
                                     if (d) return d;
                                 }
                             }
                         }
                         // Fallback: DateTime del IFD0
-                        return dt0132 ? _parseExifDateStr(dt0132) : null;
+                        return dt0132 ? _parseExifDateTimeStr(dt0132) : null;
                     } else if ((marker & 0xFF00) === 0xFF00) {
                         offset += 2 + view.getUint16(offset + 2);
                     } else break;
@@ -966,12 +968,17 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             return s;
         }
 
-        function _parseExifDateStr(str) {
-            const m = str && str.match(/^(\d{4}):(\d{2}):(\d{2})/);
+        function _parseExifDateTimeStr(str) {
+            // Formato EXIF: "YYYY:MM:DD HH:MM:SS" (la hora puede faltar)
+            const m = str && str.match(/^(\d{4}):(\d{2}):(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
             if (!m) return null;
-            const [, y, mo, d] = m;
+            const [, y, mo, d, h, mi] = m;
             if (+y < 1900 || +y > 2100 || +mo < 1 || +mo > 12 || +d < 1 || +d > 31) return null;
-            return `${y}-${mo}-${d}`;
+            let time = null;
+            if (h !== undefined && mi !== undefined && +h >= 0 && +h <= 23 && +mi >= 0 && +mi <= 59) {
+                time = `${h}:${mi}`;
+            }
+            return { date: `${y}-${mo}-${d}`, time };
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -983,9 +990,9 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
 
             // Auto-detectar fecha EXIF de la primera foto (solo en carga nueva)
             if (!append) {
-                trySetDateFromExif(filesArray[0]).then(date => {
-                    if (date) {
-                        fechaInput.value = date;
+                trySetDateFromExif(filesArray[0]).then(dt => {
+                    if (dt && dt.date) {
+                        fechaInput.value = dt.date;
                         updateAllCanvas();
                         const ind = document.getElementById('fechaExifIndicator');
                         if (ind) {
@@ -1042,7 +1049,9 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                     : '✅ ¡Fotos agregadas!';
 
                 const globalIndex = startIndex + localIndex;
-                uploadedImages[globalIndex] = { name: fileName, imgElement: img };
+                // Conservar la hora EXIF si ya se leyó (la lectura es asíncrona)
+                const horaPrev = uploadedImages[globalIndex] && uploadedImages[globalIndex].hora;
+                uploadedImages[globalIndex] = { name: fileName, imgElement: img, hora: horaPrev || null };
 
                 const globalIdxForBtn = startIndex + localIndex;
                 const wrapper = document.createElement('div');
@@ -1059,7 +1068,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 wrapper.appendChild(canvas);
                 wrapper.appendChild(btnDel);
                 newSkeletons[localIndex].replaceWith(wrapper);
-                drawWatermark(canvas, img);
+                drawWatermark(canvas, img, uploadedImages[globalIndex].hora);
 
                 if (loaded === total) {
                     downloadBtn.disabled = false;
@@ -1074,6 +1083,21 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             }
 
             filesArray.forEach((file, localIndex) => {
+                const globalIndex = startIndex + localIndex;
+
+                // Leer la hora EXIF de ESTA foto (independiente de la carga de la imagen)
+                trySetDateFromExif(file).then(dt => {
+                    const hora = (dt && dt.time) ? dt.time : null;
+                    if (!uploadedImages[globalIndex]) uploadedImages[globalIndex] = {};
+                    uploadedImages[globalIndex].hora = hora;
+                    // Si el canvas ya está dibujado, re-dibujar para incluir la hora
+                    const w = previewArea.querySelector(`.canvas-wrapper[data-global-index="${globalIndex}"]`);
+                    const cv = w && w.querySelector('canvas');
+                    if (cv && uploadedImages[globalIndex].imgElement) {
+                        drawWatermark(cv, uploadedImages[globalIndex].imgElement, hora);
+                    }
+                });
+
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     progressCurrentFile.textContent = `Leyendo: ${file.name}`;
@@ -1116,7 +1140,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             wrapper.appendChild(canvas);
             wrapper.appendChild(btnDel);
             previewArea.appendChild(wrapper);
-            drawWatermark(canvas, img);
+            drawWatermark(canvas, img, uploadedImages[globalIndex] && uploadedImages[globalIndex].hora);
         }
 
         function deletePhoto(wrapper) {
@@ -1181,7 +1205,98 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             return [tema, ...dOpts].join('-');
         }
 
-        function drawWatermark(canvas, img) {
+        // ── Metadatos / clasificación de la foto ──────────────────────────────
+        // Reúne toda la clasificación que el usuario definió para incrustarla
+        // en el archivo (XMP) y enviarla a Drive.
+        function buildPhotoMetadata(hora) {
+            const tema = temaSelect.value;
+            const dOpts = Array.from(document.querySelectorAll('.dynamic-opt-select')).map(s => s.value);
+            const espEl = document.getElementById('especialidadSelect');
+            return {
+                proyecto: proyectoInput.value || '',
+                fecha: fechaInput.value || '',
+                hora: hora || '',
+                titulo: tituloManualInput.value.trim() || '',
+                tema: tema || '',
+                especialidad: espEl ? espEl.value : '',
+                // Clasificación legible: "Tema / opción1 / opción2 ..."
+                clasificacion: [tema, ...dOpts].filter(Boolean).join(' / '),
+                // Etiquetas individuales (útil como keywords)
+                etiquetas: [tema, ...dOpts].filter(Boolean)
+            };
+        }
+
+        function _xmlEscape(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // Construye un paquete XMP estándar con la clasificación de la foto.
+        function buildXmpPacket(meta) {
+            const keywords = (meta.etiquetas || [])
+                .map(t => `<rdf:li>${_xmlEscape(t)}</rdf:li>`).join('');
+            return `<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>` +
+`<x:xmpmeta xmlns:x="adobe:ns:meta/">` +
+`<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">` +
+`<rdf:Description rdf:about="" ` +
+`xmlns:dc="http://purl.org/dc/elements/1.1/" ` +
+`xmlns:psm="http://psmarcadorfotos.local/ns/1.0/">` +
+`<dc:title><rdf:Alt><rdf:li xml:lang="x-default">${_xmlEscape(meta.titulo)}</rdf:li></rdf:Alt></dc:title>` +
+`<dc:description><rdf:Alt><rdf:li xml:lang="x-default">${_xmlEscape(meta.clasificacion)}</rdf:li></rdf:Alt></dc:description>` +
+`<dc:subject><rdf:Bag>${keywords}</rdf:Bag></dc:subject>` +
+`<psm:proyecto>${_xmlEscape(meta.proyecto)}</psm:proyecto>` +
+`<psm:fecha>${_xmlEscape(meta.fecha)}</psm:fecha>` +
+`<psm:hora>${_xmlEscape(meta.hora)}</psm:hora>` +
+`<psm:tema>${_xmlEscape(meta.tema)}</psm:tema>` +
+`<psm:especialidad>${_xmlEscape(meta.especialidad)}</psm:especialidad>` +
+`<psm:clasificacion>${_xmlEscape(meta.clasificacion)}</psm:clasificacion>` +
+`</rdf:Description></rdf:RDF></x:xmpmeta>` +
+`<?xpacket end="w"?>`;
+        }
+
+        // Inserta un segmento APP1/XMP en el JPEG (data URL) y devuelve un nuevo data URL.
+        // Si algo falla, devuelve el original sin modificar.
+        function embedXmpInJpeg(dataUrl, meta) {
+            try {
+                const comma = dataUrl.indexOf(',');
+                const b64 = dataUrl.slice(comma + 1);
+                const bin = atob(b64);
+                const bytes = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                if (bytes[0] !== 0xFF || bytes[1] !== 0xD8) return dataUrl; // no es JPEG
+
+                const header = 'http://ns.adobe.com/xap/1.0/\0';
+                const payload = header + buildXmpPacket(meta);
+                const xmpBytes = new TextEncoder().encode(payload);
+                const segLen = xmpBytes.length + 2; // incluye los 2 bytes de longitud
+                if (segLen > 0xFFFF) return dataUrl; // demasiado grande para un segmento
+
+                const segment = new Uint8Array(4 + xmpBytes.length);
+                segment[0] = 0xFF; segment[1] = 0xE1;           // marcador APP1
+                segment[2] = (segLen >> 8) & 0xFF;              // longitud (big-endian)
+                segment[3] = segLen & 0xFF;
+                segment.set(xmpBytes, 4);
+
+                // Insertar justo después del SOI (FFD8)
+                const out = new Uint8Array(bytes.length + segment.length);
+                out.set(bytes.subarray(0, 2), 0);
+                out.set(segment, 2);
+                out.set(bytes.subarray(2), 2 + segment.length);
+
+                let outBin = '';
+                const CHUNK = 0x8000;
+                for (let i = 0; i < out.length; i += CHUNK) {
+                    outBin += String.fromCharCode.apply(null, out.subarray(i, i + CHUNK));
+                }
+                return 'data:image/jpeg;base64,' + btoa(outBin);
+            } catch (e) {
+                console.warn('No se pudo incrustar XMP:', e);
+                return dataUrl;
+            }
+        }
+
+        function drawWatermark(canvas, img, hora) {
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0);
 
@@ -1218,13 +1333,21 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             
             currentY -= baseFontSize * 1.1;
             ctx.fillText(proyecto, padding, currentY);
+
+            // Hora de la foto (EXIF) — pequeña, esquina inferior derecha. Solo si está disponible.
+            if (hora) {
+                ctx.font = `${baseFontSize * 0.5}px Arial, sans-serif`;
+                ctx.textAlign = 'right';
+                ctx.fillText(hora, canvas.width - padding, canvas.height - padding);
+                ctx.textAlign = 'left';
+            }
         }
 
         function updateAllCanvas() {
             const canvases = previewArea.querySelectorAll('canvas');
             canvases.forEach((canvas, index) => {
                 if (uploadedImages[index]) {
-                    drawWatermark(canvas, uploadedImages[index].imgElement);
+                    drawWatermark(canvas, uploadedImages[index].imgElement, uploadedImages[index].hora);
                 }
             });
         }
@@ -1999,11 +2122,18 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             const canvases = Array.from(document.querySelectorAll('canvas'));
             if (canvases.length === 0) return;
 
-            // Snapshot inmediato: nombre de archivo + datos — independiente de cambios futuros en UI
-            const jobPhotos = canvases.map((canvas, i) => ({
-                fileName: generateCustomFileName(i),
-                base64: canvas.toDataURL('image/jpeg', 0.8)
-            }));
+            // Snapshot inmediato: nombre + datos + metadatos — independiente de cambios futuros en UI.
+            // Se incrustan los metadatos (XMP) dentro del propio JPEG.
+            const jobPhotos = canvases.map((canvas, i) => {
+                const hora = uploadedImages[i] ? (uploadedImages[i].hora || '') : '';
+                const meta = buildPhotoMetadata(hora);
+                const rawDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                return {
+                    fileName: generateCustomFileName(i),
+                    base64: embedXmpInJpeg(rawDataUrl, meta),
+                    metadata: meta
+                };
+            });
             const jobTitulo = tituloManualInput.value.trim() || 'Sin título';
             const jobFecha = fechaInput.value;
             const jobId = 'job_' + Date.now();
@@ -2018,7 +2148,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             let successCount = 0, errorCount = 0, skippedCount = 0;
 
             for (let i = 0; i < total; i++) {
-                const { fileName, base64 } = jobPhotos[i];
+                const { fileName, base64, metadata } = jobPhotos[i];
 
                 if (uploadedFileNames.has(fileName)) {
                     skippedCount++;
@@ -2035,7 +2165,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                     await fetch(SCRIPT_URL, {
                         method: 'POST',
                         mode: 'no-cors',
-                        body: JSON.stringify({ base64, type: 'image/jpeg', name: fileName })
+                        body: JSON.stringify({ base64, type: 'image/jpeg', name: fileName, metadata })
                     });
                     uploadedFileNames.add(fileName);
                     successCount++;
