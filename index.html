@@ -474,6 +474,10 @@
                         class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg opacity-50 cursor-not-allowed transition-all" disabled>
                         Subir a Google Drive
                     </button>
+                    <p class="text-[11px] text-center text-gray-400 leading-snug px-1">
+                        A Drive se sube la foto <strong>original sin marca</strong>; la marca se aplica
+                        dinámicamente en la galería según los metadatos y puede cambiarse luego.
+                    </p>
                     <p id="driveNuevoTituloHint" class="hidden text-xs text-center text-red-600 font-medium mt-1 leading-snug px-1"></p>
 
                 </div>
@@ -1216,6 +1220,12 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 proyecto: proyectoInput.value || '',
                 fecha: fechaInput.value || '',
                 hora: hora || '',
+                // 'si'  → la foto debe mostrarse con marca (la dibuja la galería)
+                // 'no'  → el usuario decidió omitir la marca (puede activarla luego desde la galería)
+                marca: document.getElementById('mostrarLeyenda').checked ? 'si' : 'no',
+                // Indica que la foto se subió ORIGINAL (sin marca incrustada) con el sistema nuevo.
+                // Las fotos sin este campo son del sistema viejo (marca fija en píxeles).
+                original: 'si',
                 titulo: tituloManualInput.value.trim() || '',
                 tema: tema || '',
                 especialidad: espEl ? espEl.value : '',
@@ -1251,6 +1261,8 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
 `<psm:tema>${_xmlEscape(meta.tema)}</psm:tema>` +
 `<psm:especialidad>${_xmlEscape(meta.especialidad)}</psm:especialidad>` +
 `<psm:clasificacion>${_xmlEscape(meta.clasificacion)}</psm:clasificacion>` +
+`<psm:marca>${_xmlEscape(meta.marca)}</psm:marca>` +
+`<psm:original>${_xmlEscape(meta.original)}</psm:original>` +
 `</rdf:Description></rdf:RDF></x:xmpmeta>` +
 `<?xpacket end="w"?>`;
         }
@@ -2123,11 +2135,29 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             if (canvases.length === 0) return;
 
             // Snapshot inmediato: nombre + datos + metadatos — independiente de cambios futuros en UI.
+            // IMPORTANTE: a Drive se sube la foto ORIGINAL (sin marca incrustada).
+            // La vista previa sí muestra la marca, pero la versión subida es limpia para que
+            // la galería pueda dibujar/cambiar la marca dinámicamente según los metadatos.
             // Se incrustan los metadatos (XMP) dentro del propio JPEG.
             const jobPhotos = canvases.map((canvas, i) => {
-                const hora = uploadedImages[i] ? (uploadedImages[i].hora || '') : '';
+                const item = uploadedImages[i] || {};
+                const hora = item.hora || '';
                 const meta = buildPhotoMetadata(hora);
-                const rawDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+                // Render LIMPIO: solo la imagen original, sin leyenda
+                let rawDataUrl;
+                const srcImg = item.imgElement;
+                if (srcImg && srcImg.width && srcImg.height) {
+                    const clean = document.createElement('canvas');
+                    clean.width  = srcImg.width;
+                    clean.height = srcImg.height;
+                    clean.getContext('2d').drawImage(srcImg, 0, 0);
+                    rawDataUrl = clean.toDataURL('image/jpeg', 0.8);
+                } else {
+                    // Fallback improbable: si no hay imagen fuente, usar el canvas visible
+                    rawDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                }
+
                 return {
                     fileName: generateCustomFileName(i),
                     base64: embedXmpInJpeg(rawDataUrl, meta),
