@@ -32,7 +32,7 @@
     <style>
         .preview-container {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             gap: 1rem;
         }
 
@@ -156,6 +156,44 @@
         }
         #dropOverlay.activo {
             display: flex;
+        }
+        /* ── Clasificación múltiple (arrastrar fotos a cajones) ── */
+        body.modo-multi .canvas-wrapper { cursor: grab; }
+        .canvas-wrapper.dragging { opacity: .4; outline: 2px solid #3b82f6; }
+
+        #poolHeader { display: flex; align-items: center; gap: .4rem; }
+
+        #previewArea.drop-activo,
+        .clasif-bucket .bucket-photos.drop-activo {
+            background: #eff6ff !important;
+            border-color: #3b82f6 !important;
+        }
+
+        .clasif-bucket {
+            border: 1px solid #e5e7eb;
+            border-radius: .75rem;
+            background: #fff;
+            box-shadow: 0 1px 2px rgb(0 0 0 / .04);
+        }
+        .clasif-bucket .bucket-photos {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: .6rem;
+            min-height: 86px;
+            padding: .75rem;
+            margin: 0 .75rem .75rem;
+            border: 2px dashed #e5e7eb;
+            border-radius: .6rem;
+            background: #fafafa;
+        }
+        .clasif-bucket .bucket-photos:empty::before {
+            content: attr(data-empty);
+            grid-column: 1 / -1;
+            align-self: center;
+            color: #9ca3af;
+            font-size: .8rem;
+            text-align: center;
+            padding: 1rem 0;
         }
     </style>
 </head>
@@ -500,10 +538,38 @@
                 <!-- Cola de subidas a Drive (dinámica, soporta múltiples trabajos) -->
                 <div id="driveJobsContainer" class="hidden mb-4 space-y-2"></div>
 
+                <!-- ══ Modo clasificación múltiple ══ -->
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <label class="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
+                        <input type="checkbox" id="modoMultiClasif" class="w-4 h-4 accent-blue-600 cursor-pointer" onchange="toggleModoMultiClasif()">
+                        Modo clasificación múltiple
+                    </label>
+                    <button id="btnAgregarClasif" onclick="agregarClasificacion()"
+                        class="hidden items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Agregar clasificación
+                    </button>
+                </div>
+                <p id="multiClasifHelp" class="hidden mb-3 text-xs text-gray-500 leading-snug">
+                    Selecciona una actividad en el panel izquierdo y pulsa <strong>Agregar clasificación</strong> para crear un cajón.
+                    Luego arrastra cada foto desde <em>Sin clasificar</em> hacia el cajón al que pertenece; cada foto se subirá con la clasificación de su cajón.
+                </p>
+
+                <!-- Encabezado del área "sin clasificar" (solo en modo múltiple) -->
+                <div id="poolHeader" class="hidden mb-2 text-sm font-bold text-gray-600">
+                    <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                    Sin clasificar
+                    <span id="poolCount" class="pool-count ml-1 text-gray-400 font-semibold"></span>
+                </div>
+
                 <div id="previewArea" class="preview-container custom-scrollbar max-h-screen overflow-y-auto pr-2">
                     <div class="col-span-full text-center py-20 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">
                         Cargue imágenes para visualizar la marca de agua.
                     </div>
+                </div>
+                <!-- ══ Cajones de clasificación (modo múltiple) ══ -->
+                <div id="bucketsSection" class="hidden mt-6 space-y-4">
+                    <div id="bucketsContainer" class="space-y-4"></div>
                 </div>
             </div>
 
@@ -536,6 +602,50 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
                     </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de edición de clasificación -->
+    <div id="modalEditarClasif" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 animate-fade-in max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="bg-blue-100 p-2 rounded-full">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800">Modificar clasificación</h3>
+            </div>
+            <input type="hidden" id="editBucketId">
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Tema Principal</label>
+                    <select id="editTemaSelect" onchange="editHandleTemaChange()"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"></select>
+                </div>
+                <div id="editDynamicOptions"></div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Sugerencias de Título</label>
+                    <select id="editTituloSelect" onchange="editSyncTitulo()"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"></select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Título Personalizado (Editable)</label>
+                    <textarea id="editTituloManual" rows="2"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                        placeholder="Escribe o edita el título aquí..."></textarea>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="cerrarModalEditarClasif()"
+                    class="flex-1 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-all">
+                    Cancelar
+                </button>
+                <button onclick="guardarEdicionClasif()"
+                    class="flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all">
+                    Guardar cambios
                 </button>
             </div>
         </div>
@@ -583,6 +693,13 @@
         let uploadedImages = [];
         const uploadedFileNames = new Set();
 
+        // ── Estado de clasificación múltiple ──────────────────
+        let modoMultiClasif = false;     // ¿está activo el modo de cajones?
+        let clasifBuckets   = [];        // [{ id, especialidad, tema, opts:[], titulo }]
+        let _bucketSeq      = 0;         // contador para ids de cajón
+        let _draggedWrapper = null;      // tarjeta de foto que se está arrastrando
+        let _catEdicion     = {};        // catálogo usado por el modal de edición (no toca el global)
+
         window.onload = () => {
             const today = new Date().toISOString().split('T')[0];
             fechaInput.value = today;
@@ -591,6 +708,9 @@
             if (PROYECTO_PARAM) {
                 iniciarModoProyecto();
             }
+
+            // Restaurar los cajones de clasificación guardados para este proyecto
+            cargarBucketsLS();
         };
 
         // ── MODO PROYECTO ──────────────────────────────────────────────────
@@ -1069,10 +1189,13 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 btnDel.title = 'Eliminar foto';
                 btnDel.innerHTML = '&times;';
                 btnDel.addEventListener('click', () => deletePhoto(wrapper));
+                wrapper._photo = uploadedImages[globalIndex];
                 wrapper.appendChild(canvas);
                 wrapper.appendChild(btnDel);
+                makeWrapperDraggable(wrapper);
                 newSkeletons[localIndex].replaceWith(wrapper);
-                drawWatermark(canvas, img, uploadedImages[globalIndex].hora);
+                redrawWrapper(wrapper);
+                actualizarContadores();
 
                 if (loaded === total) {
                     downloadBtn.disabled = false;
@@ -1141,22 +1264,26 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             btnDel.title = 'Eliminar foto';
             btnDel.innerHTML = '&times;';
             btnDel.addEventListener('click', () => deletePhoto(wrapper));
+            wrapper._photo = uploadedImages[globalIndex];
             wrapper.appendChild(canvas);
             wrapper.appendChild(btnDel);
+            makeWrapperDraggable(wrapper);
             previewArea.appendChild(wrapper);
-            drawWatermark(canvas, img, uploadedImages[globalIndex] && uploadedImages[globalIndex].hora);
+            redrawWrapper(wrapper);
+            actualizarContadores();
         }
 
         function deletePhoto(wrapper) {
-            const idx = parseInt(wrapper.dataset.globalIndex);
-            // Remove from uploadedImages
-            uploadedImages.splice(idx, 1);
+            // Eliminar por referencia: las tarjetas pueden estar en cualquier cajón
+            const p = wrapper._photo;
+            if (p) {
+                const idx = uploadedImages.indexOf(p);
+                if (idx !== -1) uploadedImages.splice(idx, 1);
+            }
             wrapper.remove();
-            // Re-index remaining wrappers
-            const allWrappers = previewArea.querySelectorAll('.canvas-wrapper');
-            allWrappers.forEach((w, i) => { w.dataset.globalIndex = i; });
-            // Disable buttons if no photos left
-            if (uploadedImages.length === 0) {
+            actualizarContadores();
+            // Si ya no quedan fotos en ninguna parte, restablecer el estado vacío
+            if (document.querySelectorAll('.canvas-wrapper').length === 0) {
                 downloadBtn.disabled = true;
                 downloadBtn.classList.add('opacity-50', 'cursor-not-allowed');
                 uploadDriveBtn.disabled = true;
@@ -1308,7 +1435,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             }
         }
 
-        function drawWatermark(canvas, img, hora) {
+        function drawWatermark(canvas, img, hora, clasif) {
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0);
 
@@ -1321,8 +1448,12 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             const proyecto = proyectoInput.value;
             const fechaRaw = fechaInput.value.split('-');
             const fechaFormatted = `${fechaRaw[2]}-${fechaRaw[1]}-${fechaRaw[0]}`;
-            const titulo = tituloManualInput.value;
-            const metadata = getMetadata();
+            // En modo múltiple, una foto dentro de un cajón usa la clasificación de
+            // ese cajón; si no, usa la selección actual del panel izquierdo.
+            const titulo = clasif ? (clasif.titulo || '') : tituloManualInput.value;
+            const metadata = clasif
+                ? [clasif.tema, ...(clasif.opts || [])].join(' / ')
+                : getMetadata();
 
             ctx.fillStyle = 'white';
             ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
@@ -1356,12 +1487,22 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
         }
 
         function updateAllCanvas() {
-            const canvases = previewArea.querySelectorAll('canvas');
-            canvases.forEach((canvas, index) => {
-                if (uploadedImages[index]) {
-                    drawWatermark(canvas, uploadedImages[index].imgElement, uploadedImages[index].hora);
-                }
-            });
+            document.querySelectorAll('.canvas-wrapper').forEach(redrawWrapper);
+        }
+
+        // Re-dibuja una tarjeta usando la clasificación del cajón que la contiene
+        // (o la del panel izquierdo si está en "sin clasificar").
+        function redrawWrapper(wrapper) {
+            const p = wrapper._photo;
+            if (!p || !p.imgElement) return;
+            const cv = wrapper.querySelector('canvas');
+            if (!cv) return;
+            let clasif = null;
+            const bucketEl = wrapper.closest('.clasif-bucket');
+            if (bucketEl) {
+                clasif = clasifBuckets.find(b => b.id === bucketEl.dataset.bid) || null;
+            }
+            drawWatermark(cv, p.imgElement, p.hora, clasif);
         }
 
         function getFormattedDateForFilename() {
@@ -1376,10 +1517,23 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
         }
 
         function downloadAll() {
-            const canvases = previewArea.querySelectorAll('canvas');
-            canvases.forEach((canvas, index) => {
+            // Descarga TODAS las tarjetas (sin clasificar + dentro de cajones).
+            // Cada foto conserva la marca y el nombre de su propia clasificación.
+            const wrappers = Array.from(document.querySelectorAll('.canvas-wrapper'));
+            // Numeración independiente por clasificación, para nombres consistentes.
+            const contadores = {};
+            wrappers.forEach(wrapper => {
+                const canvas = wrapper.querySelector('canvas');
+                if (!canvas) return;
+                const bucketEl = wrapper.closest('.clasif-bucket');
+                const clasif = bucketEl
+                    ? (clasifBuckets.find(b => b.id === bucketEl.dataset.bid) || snapshotSidebarClasif())
+                    : snapshotSidebarClasif();
+                const key = bucketEl ? bucketEl.dataset.bid : '_pool';
+                const idx = contadores[key] || 0;
+                contadores[key] = idx + 1;
                 const link = document.createElement('a');
-                link.download = generateCustomFileName(index);
+                link.download = fileNameFromClasif(clasif, idx);
                 link.href = canvas.toDataURL('image/jpeg', 0.9);
                 link.click();
             });
@@ -2130,46 +2284,441 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             return card;
         }
 
-        async function uploadToDrive() {
-            const canvases = Array.from(document.querySelectorAll('canvas'));
-            if (canvases.length === 0) return;
+        // ════════════════════════════════════════════════════════════════════
+        //  CLASIFICACIÓN MÚLTIPLE — cajones + arrastrar y soltar
+        // ════════════════════════════════════════════════════════════════════
 
-            // Snapshot inmediato: nombre + datos + metadatos — independiente de cambios futuros en UI.
-            // IMPORTANTE: a Drive se sube la foto ORIGINAL (sin marca incrustada).
-            // La vista previa sí muestra la marca, pero la versión subida es limpia para que
-            // la galería pueda dibujar/cambiar la marca dinámicamente según los metadatos.
-            // Se incrustan los metadatos (XMP) dentro del propio JPEG.
-            const jobPhotos = canvases.map((canvas, i) => {
-                const item = uploadedImages[i] || {};
+        // Lee la clasificación actual del panel izquierdo como objeto.
+        function snapshotSidebarClasif() {
+            const espEl = document.getElementById('especialidadSelect');
+            return {
+                especialidad: espEl ? espEl.value : '',
+                tema: temaSelect.value || '',
+                opts: Array.from(document.querySelectorAll('.dynamic-opt-select')).map(s => s.value),
+                titulo: (tituloManualInput.value || '').trim()
+            };
+        }
+
+        // Etiqueta legible de una clasificación.
+        function clasifLabel(c) {
+            const base = [c.tema, ...(c.opts || [])].filter(Boolean).join(' / ');
+            return base || 'Sin actividad';
+        }
+
+        // Metadatos para Drive a partir de una clasificación concreta (no del panel).
+        function metaFromClasif(c, hora) {
+            const opts = (c.opts || []).filter(Boolean);
+            const espEl = document.getElementById('especialidadSelect');
+            return {
+                proyecto: proyectoInput.value || '',
+                fecha: fechaInput.value || '',
+                hora: hora || '',
+                marca: document.getElementById('mostrarLeyenda').checked ? 'si' : 'no',
+                original: 'si',
+                titulo: c.titulo || '',
+                tema: c.tema || '',
+                especialidad: c.especialidad || (espEl ? espEl.value : ''),
+                clasificacion: [c.tema, ...opts].filter(Boolean).join(' / '),
+                etiquetas: [c.tema, ...opts].filter(Boolean)
+            };
+        }
+
+        // Nombre de archivo para una clasificación concreta.
+        function fileNameFromClasif(c, index) {
+            const fecha = getFormattedDateForFilename();
+            const titulo = (c.titulo || '').trim().substring(0, 50);
+            const meta = [c.tema, ...(c.opts || [])].join('-');
+            return `${fecha}_${titulo} (${meta})_${index + 1}.jpg`;
+        }
+
+        // ── Persistencia de cajones en localStorage (por proyecto) ─────────
+        function clasifStorageKey() {
+            return 'clasifBuckets_' + (proyectoInput.value || PROYECTO_PARAM || 'default');
+        }
+        function guardarBucketsLS() {
+            try {
+                localStorage.setItem(clasifStorageKey(), JSON.stringify(clasifBuckets));
+            } catch (e) { console.warn('No se pudieron guardar los cajones:', e); }
+        }
+        function cargarBucketsLS() {
+            let saved = null;
+            try { saved = JSON.parse(localStorage.getItem(clasifStorageKey()) || 'null'); }
+            catch (e) { saved = null; }
+            if (Array.isArray(saved) && saved.length) {
+                clasifBuckets = saved.map(b => ({
+                    id: b.id || ('bucket_' + (++_bucketSeq)),
+                    especialidad: b.especialidad || '',
+                    tema: b.tema || '',
+                    opts: Array.isArray(b.opts) ? b.opts : [],
+                    titulo: b.titulo || ''
+                }));
+                // Mantener el contador por encima de los ids ya usados
+                clasifBuckets.forEach(b => {
+                    const n = parseInt(String(b.id).replace(/\D/g, ''), 10);
+                    if (!isNaN(n) && n > _bucketSeq) _bucketSeq = n;
+                });
+                document.getElementById('modoMultiClasif').checked = true;
+                toggleModoMultiClasif();
+            }
+        }
+
+        // ── Activar / desactivar el modo ───────────────────────────────────
+        function toggleModoMultiClasif() {
+            modoMultiClasif = document.getElementById('modoMultiClasif').checked;
+            document.body.classList.toggle('modo-multi', modoMultiClasif);
+            const btn = document.getElementById('btnAgregarClasif');
+            btn.classList.toggle('hidden', !modoMultiClasif);
+            btn.classList.toggle('flex', modoMultiClasif);
+            document.getElementById('multiClasifHelp').classList.toggle('hidden', !modoMultiClasif);
+            document.getElementById('bucketsSection').classList.toggle('hidden', !modoMultiClasif);
+            document.getElementById('poolHeader').classList.toggle('hidden', !modoMultiClasif);
+
+            if (modoMultiClasif) {
+                renderBuckets();
+            } else {
+                // Al apagar el modo, devolver todas las fotos a "sin clasificar"
+                document.querySelectorAll('.clasif-bucket .canvas-wrapper').forEach(w => {
+                    previewArea.appendChild(w);
+                    redrawWrapper(w);
+                });
+            }
+            actualizarContadores();
+        }
+
+        // ── Crear / eliminar / editar cajones ──────────────────────────────
+        function agregarClasificacion() {
+            const c = snapshotSidebarClasif();
+            if (!c.tema) {
+                alert('Primero selecciona una actividad (especialidad y tema) en el panel izquierdo; esa será la clasificación del nuevo cajón.');
+                return;
+            }
+            const bucket = {
+                id: 'bucket_' + (++_bucketSeq),
+                especialidad: c.especialidad,
+                tema: c.tema,
+                opts: c.opts,
+                titulo: c.titulo
+            };
+            clasifBuckets.push(bucket);
+            guardarBucketsLS();
+            renderBuckets();
+            actualizarContadores();
+            const el = document.querySelector(`.clasif-bucket[data-bid="${bucket.id}"]`);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function eliminarBucket(id) {
+            const el = document.querySelector(`.clasif-bucket[data-bid="${id}"]`);
+            if (el) {
+                // Devolver sus fotos a "sin clasificar" antes de borrar el cajón
+                el.querySelectorAll('.canvas-wrapper').forEach(w => {
+                    previewArea.appendChild(w);
+                    redrawWrapper(w);
+                });
+            }
+            clasifBuckets = clasifBuckets.filter(b => b.id !== id);
+            guardarBucketsLS();
+            renderBuckets();
+            actualizarContadores();
+        }
+
+        // Re-captura la clasificación de un cajón desde el panel izquierdo.
+        function actualizarBucketDesdePanel(id) {
+            const c = snapshotSidebarClasif();
+            if (!c.tema) { alert('Selecciona una actividad en el panel izquierdo para actualizar este cajón.'); return; }
+            const b = clasifBuckets.find(x => x.id === id);
+            if (!b) return;
+            b.especialidad = c.especialidad; b.tema = c.tema; b.opts = c.opts; b.titulo = c.titulo;
+            guardarBucketsLS();
+            renderBuckets();
+            actualizarContadores();
+        }
+
+        // ── Modal para modificar una clasificación ─────────────────────────
+
+        // Texto del catálogo para una especialidad (Drive/local/GitHub) o null.
+        async function cargarTextoCatalogo(esp) {
+            try {
+                const r = getCatalogoParaEsp(esp);
+                if (r && r.data) return r.data;
+            } catch (e) { /* sigue con GitHub */ }
+            if (URLS_CATALOGO[esp]) {
+                try {
+                    const resp = await fetch(URLS_CATALOGO[esp] + "?t=" + Date.now());
+                    if (resp.ok) {
+                        const t = await resp.text();
+                        if (t && t.trim()) return t;
+                    }
+                } catch (e) { console.warn('No se pudo cargar el catálogo de', esp, e); }
+            }
+            return null;
+        }
+
+        // Prepara _catEdicion garantizando el tema del cajón, SIN tocar el
+        // catálogo global del panel (dataCatalogo).
+        async function prepararCatalogoEdicion(esp, tema) {
+            if (tema && dataCatalogo[tema]) { _catEdicion = dataCatalogo; return; }
+            const candidatos = [];
+            if (esp) candidatos.push(esp);
+            ['EM', 'Civil'].forEach(e => { if (!candidatos.includes(e)) candidatos.push(e); });
+            for (const e of candidatos) {
+                const txt = await cargarTextoCatalogo(e);
+                if (txt) {
+                    const obj = parseCatalogText(txt);
+                    if (!tema || obj[tema]) { _catEdicion = obj; return; }
+                }
+            }
+            _catEdicion = Object.keys(dataCatalogo).length ? dataCatalogo : {};
+        }
+
+        async function abrirModalEditarClasif(id) {
+            const b = clasifBuckets.find(x => x.id === id);
+            if (!b) return;
+            document.getElementById('editBucketId').value = id;
+
+            // Cargar el catálogo necesario si aún no se ha seleccionado especialidad
+            await prepararCatalogoEdicion(b.especialidad, b.tema);
+
+            // Poblar temas desde el catálogo de edición
+            const temaSel = document.getElementById('editTemaSelect');
+            const temas = Object.keys(_catEdicion);
+            temaSel.innerHTML = '';
+            if (!temas.length) {
+                if (b.tema) {
+                    const opt = document.createElement('option');
+                    opt.value = b.tema; opt.textContent = b.tema;
+                    temaSel.appendChild(opt);
+                }
+            } else {
+                temas.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t; opt.textContent = t;
+                    temaSel.appendChild(opt);
+                });
+            }
+            temaSel.value = b.tema || temaSel.value;
+
+            // Construir opciones dinámicas preseleccionando las del cajón
+            editHandleTemaChange(b.opts);
+
+            // Título personalizado
+            document.getElementById('editTituloManual').value = b.titulo || '';
+
+            document.getElementById('modalEditarClasif').classList.remove('hidden');
+        }
+
+        // Reconstruye los selects de opciones del modal según el tema elegido.
+        // preset (opcional): array de valores a preseleccionar por nivel.
+        function editHandleTemaChange(preset) {
+            const tema = document.getElementById('editTemaSelect').value;
+            const cont = document.getElementById('editDynamicOptions');
+            const tituloSel = document.getElementById('editTituloSelect');
+            cont.innerHTML = '';
+            tituloSel.innerHTML = '';
+            const config = _catEdicion[tema];
+            if (!config) return;
+
+            if (config.options) {
+                Object.keys(config.options).sort().forEach((level, i) => {
+                    const valores = config.options[level];
+                    const div = document.createElement('div');
+                    div.className = 'mb-2';
+                    div.innerHTML = `
+                        <label class="block text-xs font-bold text-gray-500 uppercase">Opción ${level}</label>
+                        <select class="edit-opt-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border">
+                            ${valores.map(o => `<option value="${o}">${o}</option>`).join('')}
+                        </select>`;
+                    cont.appendChild(div);
+                    const sel = div.querySelector('select');
+                    if (preset && preset[i] != null && valores.includes(preset[i])) {
+                        sel.value = preset[i];
+                    }
+                });
+            }
+
+            (config.titles || []).forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t; opt.textContent = t;
+                tituloSel.appendChild(opt);
+            });
+        }
+
+        // Copia la sugerencia elegida al título editable del modal.
+        function editSyncTitulo() {
+            document.getElementById('editTituloManual').value = document.getElementById('editTituloSelect').value;
+        }
+
+        function cerrarModalEditarClasif() {
+            document.getElementById('modalEditarClasif').classList.add('hidden');
+        }
+
+        function guardarEdicionClasif() {
+            const id = document.getElementById('editBucketId').value;
+            const b = clasifBuckets.find(x => x.id === id);
+            if (!b) { cerrarModalEditarClasif(); return; }
+            const tema = document.getElementById('editTemaSelect').value;
+            if (!tema) { alert('Selecciona un tema.'); return; }
+            const opts = Array.from(document.querySelectorAll('#editDynamicOptions .edit-opt-select')).map(s => s.value);
+            b.tema = tema;
+            b.opts = opts;
+            b.titulo = (document.getElementById('editTituloManual').value || '').trim();
+            guardarBucketsLS();
+            renderBuckets();
+            actualizarContadores();
+            cerrarModalEditarClasif();
+        }
+
+        // ── Render de los cajones (conservando las fotos ya colocadas) ─────
+        function renderBuckets() {
+            const cont = document.getElementById('bucketsContainer');
+            if (!cont) return;
+            // Guardar las tarjetas que ya estaban dentro de cada cajón
+            const previas = {};
+            cont.querySelectorAll('.clasif-bucket').forEach(el => {
+                previas[el.dataset.bid] = Array.from(el.querySelectorAll('.canvas-wrapper'));
+            });
+
+            cont.innerHTML = '';
+            if (!clasifBuckets.length) {
+                cont.innerHTML = '<div class="text-center text-sm text-gray-400 border-2 border-dashed border-gray-200 rounded-xl py-8">Aún no hay clasificaciones. Pulsa \u201cAgregar clasificación\u201d.</div>';
+                return;
+            }
+
+            clasifBuckets.forEach(b => {
+                const card = document.createElement('div');
+                card.className = 'clasif-bucket';
+                card.dataset.bid = b.id;
+                const label = clasifLabel(b);
+                const tituloLinea = b.titulo
+                    ? `<p class="text-xs text-gray-500 italic truncate">${b.titulo}</p>`
+                    : '';
+                card.innerHTML = `
+                    <div class="flex items-start justify-between gap-2 p-3 pb-2">
+                        <div class="min-w-0">
+                            <p class="text-sm font-bold text-gray-800 truncate">${label}</p>
+                            ${tituloLinea}
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span class="bucket-count text-xs font-bold text-blue-600 bg-blue-50 rounded-full px-2 py-0.5">0</span>
+                            <button title="Actualizar este cajón con la actividad del panel"
+                                class="text-gray-400 hover:text-blue-600 p-1"
+                                onclick="actualizarBucketDesdePanel('${b.id}')">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            </button>
+                            <button title="Modificar esta clasificación"
+                                class="text-gray-400 hover:text-blue-600 p-1"
+                                onclick="abrirModalEditarClasif('${b.id}')">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            </button>
+                            <button title="Eliminar esta clasificación"
+                                class="text-gray-400 hover:text-red-600 p-1"
+                                onclick="eliminarBucket('${b.id}')">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="bucket-photos" data-empty="Arrastra aquí las fotos de esta clasificación"></div>`;
+                cont.appendChild(card);
+
+                const zona = card.querySelector('.bucket-photos');
+                attachDropZone(zona);
+
+                // Restaurar las tarjetas que ya estaban en este cajón
+                (previas[b.id] || []).forEach(w => { zona.appendChild(w); redrawWrapper(w); });
+            });
+        }
+
+        // ── Contadores (sin clasificar + por cajón) ────────────────────────
+        function actualizarContadores() {
+            const poolN = previewArea.querySelectorAll('.canvas-wrapper').length;
+            const poolCountEl = document.getElementById('poolCount');
+            if (poolCountEl) poolCountEl.textContent = `(${poolN})`;
+            const ph = document.getElementById('poolHeader');
+            if (ph) ph.classList.remove('text-red-600');
+            document.querySelectorAll('.clasif-bucket').forEach(el => {
+                const n = el.querySelectorAll('.canvas-wrapper').length;
+                const c = el.querySelector('.bucket-count');
+                if (c) c.textContent = n;
+            });
+        }
+
+        // ── Arrastrar y soltar tarjetas de foto ────────────────────────────
+        function makeWrapperDraggable(wrapper) {
+            wrapper.setAttribute('draggable', 'true');
+            wrapper.addEventListener('dragstart', e => {
+                _draggedWrapper = wrapper;
+                wrapper.classList.add('dragging');
+                if (e.dataTransfer) {
+                    e.dataTransfer.effectAllowed = 'move';
+                    // tipo NO-"Files" para que el overlay de subida de archivos no se active
+                    e.dataTransfer.setData('text/x-foto', '1');
+                }
+            });
+            wrapper.addEventListener('dragend', () => {
+                wrapper.classList.remove('dragging');
+                _draggedWrapper = null;
+                document.querySelectorAll('.drop-activo').forEach(el => el.classList.remove('drop-activo'));
+            });
+        }
+
+        // Convierte un contenedor en zona donde soltar tarjetas de foto.
+        function attachDropZone(zona) {
+            zona.addEventListener('dragover', e => {
+                if (!_draggedWrapper) return;     // ignorar arrastres de archivos
+                e.preventDefault();
+                e.stopPropagation();
+                zona.classList.add('drop-activo');
+            });
+            zona.addEventListener('dragleave', e => {
+                if (e.target === zona) zona.classList.remove('drop-activo');
+            });
+            zona.addEventListener('drop', e => {
+                if (!_draggedWrapper) return;
+                e.preventDefault();
+                e.stopPropagation();
+                zona.classList.remove('drop-activo');
+                const ph = zona.querySelector('.col-span-full');
+                if (ph) ph.remove();
+                zona.appendChild(_draggedWrapper);
+                redrawWrapper(_draggedWrapper);
+                actualizarContadores();
+            });
+        }
+
+        // El área "sin clasificar" también recibe tarjetas (al arrastrarlas de vuelta).
+        attachDropZone(previewArea);
+
+        // ── Subir una lista de tarjetas con UNA clasificación dada ─────────
+        async function subirLista(wrappers, clasif, jobTitulo, jobFecha, addToCatalog) {
+            if (!wrappers || !wrappers.length) return;
+            const total = wrappers.length;
+            const jobId = 'job_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+
+            // Snapshot inmediato: imagen ORIGINAL limpia + metadatos de la clasificación
+            const jobPhotos = wrappers.map((wrapper, i) => {
+                const item = wrapper._photo || {};
                 const hora = item.hora || '';
-                const meta = buildPhotoMetadata(hora);
-
-                // Render LIMPIO: solo la imagen original, sin leyenda
-                let rawDataUrl;
+                const meta = metaFromClasif(clasif, hora);
+                let rawDataUrl = null;
                 const srcImg = item.imgElement;
                 if (srcImg && srcImg.width && srcImg.height) {
                     const clean = document.createElement('canvas');
-                    clean.width  = srcImg.width;
+                    clean.width = srcImg.width;
                     clean.height = srcImg.height;
                     clean.getContext('2d').drawImage(srcImg, 0, 0);
                     rawDataUrl = clean.toDataURL('image/jpeg', 0.8);
                 } else {
-                    // Fallback improbable: si no hay imagen fuente, usar el canvas visible
-                    rawDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    const cv = wrapper.querySelector('canvas');
+                    if (cv) rawDataUrl = cv.toDataURL('image/jpeg', 0.8);
                 }
-
                 return {
-                    fileName: generateCustomFileName(i),
-                    base64: embedXmpInJpeg(rawDataUrl, meta),
+                    fileName: fileNameFromClasif(clasif, i),
+                    base64: rawDataUrl ? embedXmpInJpeg(rawDataUrl, meta) : null,
                     metadata: meta
                 };
             });
-            const jobTitulo = tituloManualInput.value.trim() || 'Sin título';
-            const jobFecha = fechaInput.value;
-            const jobId = 'job_' + Date.now();
-            const total = jobPhotos.length;
 
-            const card = crearTarjetaSubida(jobId, jobTitulo, jobFecha, total);
+            const card = crearTarjetaSubida(jobId, jobTitulo || 'Sin título', jobFecha, total);
             const bar = card.querySelector('.job-bar');
             const countEl = card.querySelector('.job-count');
             const statusEl = card.querySelector('.job-status');
@@ -2179,6 +2728,14 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
 
             for (let i = 0; i < total; i++) {
                 const { fileName, base64, metadata } = jobPhotos[i];
+
+                if (!base64) {
+                    errorCount++;
+                    const pct = Math.round(((i + 1) / total) * 100);
+                    bar.style.width = `${pct}%`;
+                    countEl.textContent = `${i + 1} / ${total}`;
+                    continue;
+                }
 
                 if (uploadedFileNames.has(fileName)) {
                     skippedCount++;
@@ -2199,7 +2756,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                     });
                     uploadedFileNames.add(fileName);
                     successCount++;
-                } catch(e) {
+                } catch (e) {
                     errorCount++;
                 }
                 const pct = Math.round(((i + 1) / total) * 100);
@@ -2218,7 +2775,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 }
                 bar.classList.remove('bg-indigo-500');
                 bar.classList.add('bg-green-500');
-                if (nuevasSubidas > 0) await agregarTituloAlCatalogo();
+                if (nuevasSubidas > 0 && addToCatalog) await agregarTituloAlCatalogo();
             } else {
                 statusEl.textContent = `⚠️ ${nuevasSubidas} subidas, ${errorCount} con error`;
                 bar.classList.remove('bg-indigo-500');
@@ -2235,6 +2792,56 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                     if (!container.children.length) container.classList.add('hidden');
                 }, 500);
             }, 7000);
+        }
+
+        // ── Despachador de subida ──────────────────────────────────────────
+        // Modo múltiple  -> un trabajo por cajón con fotos (+ las "sin clasificar").
+        // Modo clásico   -> una sola clasificación (la del panel) para todas.
+        async function uploadToDrive() {
+            const allWrappers = Array.from(document.querySelectorAll('.canvas-wrapper'));
+            if (!allWrappers.length) return;
+            const jobFecha = fechaInput.value;
+
+            if (modoMultiClasif && clasifBuckets.length) {
+                let algo = false;
+
+                // 1) Un trabajo por cada cajón que tenga fotos
+                for (const b of clasifBuckets) {
+                    const el = document.querySelector(`.clasif-bucket[data-bid="${b.id}"]`);
+                    if (!el) continue;
+                    const ws = Array.from(el.querySelectorAll('.canvas-wrapper'));
+                    if (!ws.length) continue;
+                    algo = true;
+                    await subirLista(ws, b, b.titulo || clasifLabel(b), jobFecha, false);
+                }
+
+                // 2) Fotos que quedaron sin clasificar -> usan el panel izquierdo
+                const poolWrappers = Array.from(previewArea.querySelectorAll('.canvas-wrapper'));
+                const poolHeaderEl = document.getElementById('poolHeader');
+                if (poolWrappers.length) {
+                    const sc = snapshotSidebarClasif();
+                    if (!sc.tema) {
+                        // No se pueden subir sin clasificación: avisar sin bloquear
+                        if (poolHeaderEl) {
+                            poolHeaderEl.classList.add('text-red-600');
+                            const c = document.getElementById('poolCount');
+                            if (c) c.textContent = `(${poolWrappers.length}) · arrástralas a un cajón o elige una actividad en el panel`;
+                        }
+                    } else {
+                        algo = true;
+                        if (poolHeaderEl) poolHeaderEl.classList.remove('text-red-600');
+                        await subirLista(poolWrappers, sc, sc.titulo || clasifLabel(sc), jobFecha, true);
+                    }
+                }
+
+                if (!algo) {
+                    alert('No hay fotos listas para subir. Arrastra fotos a un cajón, o selecciona una actividad para las fotos sin clasificar.');
+                }
+            } else {
+                // Modo clásico: una sola clasificación (la del panel) para todas
+                const sc = snapshotSidebarClasif();
+                await subirLista(allWrappers, sc, sc.titulo || 'Sin título', jobFecha, true);
+            }
         }
         // ── Drag & Drop de fotos ──────────────────────────────────────────
         (function() {
