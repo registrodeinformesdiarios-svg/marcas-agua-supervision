@@ -160,6 +160,24 @@
         /* ── Clasificación múltiple (arrastrar fotos a cajones) ── */
         body.modo-multi .canvas-wrapper { cursor: grab; }
         .canvas-wrapper.dragging { opacity: .4; outline: 2px solid #3b82f6; }
+        .canvas-wrapper.pre-arrastre { outline: 2px solid #93c5fd; transform: scale(.97); transition: transform .12s; }
+
+        /* Miniatura que sigue el dedo durante el arrastre táctil */
+        .drag-ghost {
+            position: fixed;
+            top: 0; left: 0;
+            width: 110px;
+            z-index: 60;
+            pointer-events: none;
+            border-radius: .5rem;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgb(0 0 0 / .35);
+            opacity: .92;
+            transform: translate(-9999px, -9999px);
+        }
+        .drag-ghost canvas, .drag-ghost img { width: 100%; height: auto; display: block; }
+        body.arrastrando-touch { -webkit-user-select: none; user-select: none; }
+        body.arrastrando-touch .canvas-wrapper { touch-action: none; }
 
         #poolHeader { display: flex; align-items: center; gap: .4rem; }
 
@@ -2617,7 +2635,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                             </button>
                         </div>
                     </div>
-                    <div class="bucket-photos" data-empty="Arrastra aquí las fotos de esta clasificación"></div>`;
+                    <div class="bucket-photos" data-empty="Arrastra aquí las fotos (en móvil, mantén pulsada la foto)"></div>`;
                 cont.appendChild(card);
 
                 const zona = card.querySelector('.bucket-photos');
@@ -2643,7 +2661,26 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
         }
 
         // ── Arrastrar y soltar tarjetas de foto ────────────────────────────
+
+        // Mueve una tarjeta a una zona (usado por ratón y por táctil).
+        function moverWrapperAZona(wrapper, zona) {
+            if (!wrapper || !zona) return;
+            const ph = zona.querySelector('.col-span-full');
+            if (ph) ph.remove();
+            zona.appendChild(wrapper);
+            redrawWrapper(wrapper);
+            actualizarContadores();
+        }
+
+        // Devuelve la zona de destino válida bajo un punto de pantalla.
+        function zonaDesdePunto(x, y) {
+            const el = document.elementFromPoint(x, y);
+            if (!el) return null;
+            return el.closest('.bucket-photos') || el.closest('.preview-container');
+        }
+
         function makeWrapperDraggable(wrapper) {
+            // --- Arrastre con ratón (HTML5 nativo) ---
             wrapper.setAttribute('draggable', 'true');
             wrapper.addEventListener('dragstart', e => {
                 _draggedWrapper = wrapper;
@@ -2659,6 +2696,92 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 _draggedWrapper = null;
                 document.querySelectorAll('.drop-activo').forEach(el => el.classList.remove('drop-activo'));
             });
+
+            // --- Arrastre táctil (móvil): pulsación sostenida + miniatura ---
+            let holdTimer = null, ghost = null, dragging = false;
+            let startX = 0, startY = 0, lastZona = null;
+
+            const limpiar = () => {
+                clearTimeout(holdTimer); holdTimer = null;
+                wrapper.classList.remove('pre-arrastre');
+                if (ghost) { ghost.remove(); ghost = null; }
+                if (dragging) {
+                    wrapper.classList.remove('dragging');
+                    document.body.classList.remove('arrastrando-touch');
+                    document.querySelectorAll('.drop-activo').forEach(el => el.classList.remove('drop-activo'));
+                    _draggedWrapper = null;
+                }
+                dragging = false; lastZona = null;
+            };
+
+            const iniciarArrastre = () => {
+                dragging = true;
+                _draggedWrapper = wrapper;
+                wrapper.classList.remove('pre-arrastre');
+                wrapper.classList.add('dragging');
+                document.body.classList.add('arrastrando-touch');
+                // Crear miniatura clonando el canvas de la foto
+                ghost = document.createElement('div');
+                ghost.className = 'drag-ghost';
+                const cv = wrapper.querySelector('canvas');
+                if (cv) {
+                    const mini = document.createElement('canvas');
+                    mini.width = cv.width; mini.height = cv.height;
+                    mini.getContext('2d').drawImage(cv, 0, 0);
+                    ghost.appendChild(mini);
+                }
+                document.body.appendChild(ghost);
+                if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
+            };
+
+            const moverGhost = (x, y) => {
+                if (ghost) ghost.style.transform = `translate(${x - 55}px, ${y - 55}px)`;
+            };
+
+            wrapper.addEventListener('touchstart', e => {
+                // No iniciar arrastre si se toca el botón de borrar
+                if (e.target.closest('.btn-delete-photo')) return;
+                if (e.touches.length !== 1) return;
+                const t = e.touches[0];
+                startX = t.clientX; startY = t.clientY;
+                wrapper.classList.add('pre-arrastre');
+                holdTimer = setTimeout(() => {
+                    iniciarArrastre();
+                    moverGhost(startX, startY);
+                }, 280);
+            }, { passive: true });
+
+            wrapper.addEventListener('touchmove', e => {
+                const t = e.touches[0];
+                if (!dragging) {
+                    // Si se mueve antes de activar el arrastre, es un scroll: cancelar
+                    if (Math.abs(t.clientX - startX) > 10 || Math.abs(t.clientY - startY) > 10) {
+                        clearTimeout(holdTimer); holdTimer = null;
+                        wrapper.classList.remove('pre-arrastre');
+                    }
+                    return;
+                }
+                e.preventDefault();   // bloquear scroll mientras se arrastra
+                moverGhost(t.clientX, t.clientY);
+                const zona = zonaDesdePunto(t.clientX, t.clientY);
+                if (zona !== lastZona) {
+                    document.querySelectorAll('.drop-activo').forEach(el => el.classList.remove('drop-activo'));
+                    if (zona) zona.classList.add('drop-activo');
+                    lastZona = zona;
+                }
+            }, { passive: false });
+
+            wrapper.addEventListener('touchend', e => {
+                if (dragging) {
+                    const t = (e.changedTouches && e.changedTouches[0]) || null;
+                    const zona = t ? zonaDesdePunto(t.clientX, t.clientY) : null;
+                    if (zona && zona !== wrapper.parentElement) {
+                        moverWrapperAZona(wrapper, zona);
+                    }
+                }
+                limpiar();
+            });
+            wrapper.addEventListener('touchcancel', limpiar);
         }
 
         // Convierte un contenedor en zona donde soltar tarjetas de foto.
@@ -2677,11 +2800,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 e.preventDefault();
                 e.stopPropagation();
                 zona.classList.remove('drop-activo');
-                const ph = zona.querySelector('.col-span-full');
-                if (ph) ph.remove();
-                zona.appendChild(_draggedWrapper);
-                redrawWrapper(_draggedWrapper);
-                actualizarContadores();
+                moverWrapperAZona(_draggedWrapper, zona);
             });
         }
 
