@@ -1181,27 +1181,43 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 newSkeletons.push(skeleton);
             });
 
-            function onImageReady(localIndex, img, fileName) {
-                loaded++;
-                const pct = Math.round((loaded / total) * 100);
-                progressBar.style.width = `${pct}%`;
-                progressText.textContent = `${loaded} / ${total}`;
-                progressCurrentFile.textContent = loaded < total
-                    ? `Procesando: ${filesArray[loaded]?.name || ''}`
-                    : '✅ ¡Fotos agregadas!';
-
+            // Procesa UNA foto: lee EXIF, decodifica, crea previsualización
+            // reducida y guarda el File original (para subir en resolución completa).
+            async function procesarFoto(file, localIndex) {
                 const globalIndex = startIndex + localIndex;
-                // Conservar la hora EXIF si ya se leyó (la lectura es asíncrona)
-                const horaPrev = uploadedImages[globalIndex] && uploadedImages[globalIndex].hora;
-                uploadedImages[globalIndex] = { name: fileName, imgElement: img, hora: horaPrev || null };
+                progressCurrentFile.textContent = `Leyendo: ${file.name}`;
 
-                const globalIdxForBtn = startIndex + localIndex;
+                // Hora EXIF
+                let hora = null;
+                try {
+                    const dt = await trySetDateFromExif(file);
+                    hora = (dt && dt.time) ? dt.time : null;
+                } catch (e) { /* sin hora */ }
+
+                let preview = null;
+                try {
+                    const full = await fileAImagen(file);      // resolución completa (temporal)
+                    preview = await imagenAPreview(full);       // copia reducida (se conserva)
+                    // 'full' queda fuera de alcance y el recolector de basura lo libera
+                } catch (e) {
+                    console.warn('No se pudo cargar la imagen', file.name, e);
+                }
+
+                // Registro de la foto: guardamos el File para subir el original
+                uploadedImages[globalIndex] = {
+                    name: file.name,
+                    file: file,
+                    imgElement: preview,   // imagen ligera solo para previsualizar
+                    hora: hora
+                };
+
+                // Construir la tarjeta con un lienzo del tamaño de la previsualización
                 const wrapper = document.createElement('div');
                 wrapper.className = 'canvas-wrapper';
-                wrapper.dataset.globalIndex = globalIdxForBtn;
+                wrapper.dataset.globalIndex = globalIndex;
                 const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
+                if (preview) { canvas.width = preview.width; canvas.height = preview.height; }
+                else { canvas.width = 600; canvas.height = 400; }
                 const btnDel = document.createElement('button');
                 btnDel.className = 'btn-delete-photo';
                 btnDel.title = 'Eliminar foto';
@@ -1211,63 +1227,34 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 wrapper.appendChild(canvas);
                 wrapper.appendChild(btnDel);
                 makeWrapperDraggable(wrapper);
-                newSkeletons[localIndex].replaceWith(wrapper);
-                redrawWrapper(wrapper);
+                if (newSkeletons[localIndex]) newSkeletons[localIndex].replaceWith(wrapper);
+                else previewArea.appendChild(wrapper);
+                if (preview) redrawWrapper(wrapper);
                 actualizarContadores();
 
-                if (loaded === total) {
-                    downloadBtn.disabled = false;
-                    downloadBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                    uploadDriveBtn.disabled = false;
-                    uploadDriveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                    document.getElementById('addMoreBtn').classList.remove('hidden');
-                    setTimeout(() => {
-                        progressContainer.classList.add('hidden');
-                    }, 2000);
-                }
+                loaded++;
+                const pct = Math.round((loaded / total) * 100);
+                progressBar.style.width = `${pct}%`;
+                progressText.textContent = `${loaded} / ${total}`;
+                progressCurrentFile.textContent = loaded < total
+                    ? `Procesando: ${filesArray[loaded]?.name || ''}`
+                    : '✅ ¡Fotos agregadas!';
             }
 
-            filesArray.forEach((file, localIndex) => {
-                const globalIndex = startIndex + localIndex;
-
-                // Leer la hora EXIF de ESTA foto (independiente de la carga de la imagen)
-                trySetDateFromExif(file).then(dt => {
-                    const hora = (dt && dt.time) ? dt.time : null;
-                    if (!uploadedImages[globalIndex]) uploadedImages[globalIndex] = {};
-                    uploadedImages[globalIndex].hora = hora;
-                    // Si el canvas ya está dibujado, re-dibujar para incluir la hora
-                    const w = previewArea.querySelector(`.canvas-wrapper[data-global-index="${globalIndex}"]`);
-                    const cv = w && w.querySelector('canvas');
-                    if (cv && uploadedImages[globalIndex].imgElement) {
-                        drawWatermark(cv, uploadedImages[globalIndex].imgElement, hora);
-                    }
-                });
-
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    progressCurrentFile.textContent = `Leyendo: ${file.name}`;
-                    const img = new Image();
-                    img.onload = () => onImageReady(localIndex, img, file.name);
-                    img.onerror = () => {
-                        // Si falla una imagen, igual contar como procesada
-                        progressCurrentFile.textContent = `⚠️ No se pudo cargar: ${file.name}`;
-                        onImageReady(localIndex, new Image(), file.name);
-                    };
-                    img.src = e.target.result;
-                };
-                reader.onerror = () => {
-                    progressCurrentFile.textContent = `⚠️ Error leyendo: ${file.name}`;
-                    loaded++;
-                    const pct = Math.round((loaded / total) * 100);
-                    progressBar.style.width = `${pct}%`;
-                    progressText.textContent = `${loaded} / ${total}`;
-                    newSkeletons[localIndex].remove();
-                    if (loaded === total) {
-                        progressContainer.classList.add('hidden');
-                    }
-                };
-                reader.readAsDataURL(file);
-            });
+            // Procesamiento EN SERIE (una foto a la vez) para no agotar la memoria
+            (async () => {
+                for (let i = 0; i < filesArray.length; i++) {
+                    await procesarFoto(filesArray[i], i);
+                    // Ceder el hilo entre fotos para mantener la interfaz fluida
+                    await new Promise(r => setTimeout(r, 0));
+                }
+                downloadBtn.disabled = false;
+                downloadBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                uploadDriveBtn.disabled = false;
+                uploadDriveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                document.getElementById('addMoreBtn').classList.remove('hidden');
+                setTimeout(() => { progressContainer.classList.add('hidden'); }, 2000);
+            })();
         }
 
         function createImageCanvas(img, globalIndex) {
@@ -1453,9 +1440,50 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             }
         }
 
+        // ── Utilidades de memoria/rendimiento para muchas fotos ────────────
+        // Lado mayor del lienzo de PREVISUALIZACIÓN. El original se sube en
+        // resolución completa (se decodifica desde el archivo al momento de subir).
+        const MAX_PREVIEW_DIM = 1400;
+
+        function dimsEscaladas(w, h, max) {
+            if (w <= max && h <= max) return { w, h };
+            const r = w > h ? max / w : max / h;
+            return { w: Math.max(1, Math.round(w * r)), h: Math.max(1, Math.round(h * r)) };
+        }
+
+        // Decodifica un File a una Image (resolución completa). Se usa al subir
+        // y al descargar, y se libera enseguida para no acumular memoria.
+        function fileAImagen(file) {
+            return new Promise((resolve, reject) => {
+                const r = new FileReader();
+                r.onload = e => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                r.onerror = reject;
+                r.readAsDataURL(file);
+            });
+        }
+
+        // A partir de una Image full-res, crea una Image de previsualización
+        // reducida (ligera) que es la que se mantiene en memoria por foto.
+        function imagenAPreview(imgFull) {
+            return new Promise(resolve => {
+                const { w, h } = dimsEscaladas(imgFull.width, imgFull.height, MAX_PREVIEW_DIM);
+                const c = document.createElement('canvas');
+                c.width = w; c.height = h;
+                c.getContext('2d').drawImage(imgFull, 0, 0, w, h);
+                const out = new Image();
+                out.onload = () => resolve(out);
+                out.src = c.toDataURL('image/jpeg', 0.85);
+            });
+        }
+
         function drawWatermark(canvas, img, hora, clasif) {
             const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
             if (!document.getElementById('mostrarLeyenda').checked) return;
 
@@ -1534,15 +1562,13 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             return `${fecha}_${titulo} (${meta})_${index + 1}.jpg`;
         }
 
-        function downloadAll() {
+        async function downloadAll() {
             // Descarga TODAS las tarjetas (sin clasificar + dentro de cajones).
-            // Cada foto conserva la marca y el nombre de su propia clasificación.
+            // Cada foto se regenera a RESOLUCIÓN COMPLETA desde su archivo original,
+            // con la marca y el nombre de su propia clasificación.
             const wrappers = Array.from(document.querySelectorAll('.canvas-wrapper'));
-            // Numeración independiente por clasificación, para nombres consistentes.
             const contadores = {};
-            wrappers.forEach(wrapper => {
-                const canvas = wrapper.querySelector('canvas');
-                if (!canvas) return;
+            for (const wrapper of wrappers) {
                 const bucketEl = wrapper.closest('.clasif-bucket');
                 const clasif = bucketEl
                     ? (clasifBuckets.find(b => b.id === bucketEl.dataset.bid) || snapshotSidebarClasif())
@@ -1550,11 +1576,31 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 const key = bucketEl ? bucketEl.dataset.bid : '_pool';
                 const idx = contadores[key] || 0;
                 contadores[key] = idx + 1;
+
+                const p = wrapper._photo || {};
+                let dataUrl = null;
+                if (p.file) {
+                    try {
+                        const img = await fileAImagen(p.file);
+                        const c = document.createElement('canvas');
+                        c.width = img.width; c.height = img.height;
+                        drawWatermark(c, img, p.hora || '', clasif);
+                        dataUrl = c.toDataURL('image/jpeg', 0.9);
+                    } catch (e) { dataUrl = null; }
+                }
+                if (!dataUrl) {
+                    const cv = wrapper.querySelector('canvas');
+                    if (cv) dataUrl = cv.toDataURL('image/jpeg', 0.9);
+                }
+                if (!dataUrl) continue;
+
                 const link = document.createElement('a');
                 link.download = fileNameFromClasif(clasif, idx);
-                link.href = canvas.toDataURL('image/jpeg', 0.9);
+                link.href = dataUrl;
                 link.click();
-            });
+                // Pausa breve entre descargas para liberar memoria y evitar bloqueos
+                await new Promise(r => setTimeout(r, 120));
+            }
         }
 
         // ── Lógica de propuesta de nuevo título ──────────────────────────────
@@ -2813,27 +2859,15 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             const total = wrappers.length;
             const jobId = 'job_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
-            // Snapshot inmediato: imagen ORIGINAL limpia + metadatos de la clasificación
-            const jobPhotos = wrappers.map((wrapper, i) => {
+            // Solo metadatos ligeros por adelantado (sin canvas ni base64).
+            const jobMeta = wrappers.map((wrapper, i) => {
                 const item = wrapper._photo || {};
                 const hora = item.hora || '';
-                const meta = metaFromClasif(clasif, hora);
-                let rawDataUrl = null;
-                const srcImg = item.imgElement;
-                if (srcImg && srcImg.width && srcImg.height) {
-                    const clean = document.createElement('canvas');
-                    clean.width = srcImg.width;
-                    clean.height = srcImg.height;
-                    clean.getContext('2d').drawImage(srcImg, 0, 0);
-                    rawDataUrl = clean.toDataURL('image/jpeg', 0.8);
-                } else {
-                    const cv = wrapper.querySelector('canvas');
-                    if (cv) rawDataUrl = cv.toDataURL('image/jpeg', 0.8);
-                }
                 return {
+                    file: item.file || null,
+                    previewCanvas: wrapper.querySelector('canvas'),
                     fileName: fileNameFromClasif(clasif, i),
-                    base64: rawDataUrl ? embedXmpInJpeg(rawDataUrl, meta) : null,
-                    metadata: meta
+                    metadata: metaFromClasif(clasif, hora)
                 };
             });
 
@@ -2845,24 +2879,48 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
 
             let successCount = 0, errorCount = 0, skippedCount = 0;
 
-            for (let i = 0; i < total; i++) {
-                const { fileName, base64, metadata } = jobPhotos[i];
+            // Genera el base64 del ORIGINAL decodificándolo en el momento (y lo libera).
+            async function generarBase64(m) {
+                let rawDataUrl = null;
+                if (m.file) {
+                    try {
+                        const img = await fileAImagen(m.file);   // resolución completa, temporal
+                        const clean = document.createElement('canvas');
+                        clean.width = img.width;
+                        clean.height = img.height;
+                        clean.getContext('2d').drawImage(img, 0, 0);
+                        rawDataUrl = clean.toDataURL('image/jpeg', 0.85);
+                        // clean e img quedan para recolección de basura al salir
+                    } catch (e) { rawDataUrl = null; }
+                }
+                if (!rawDataUrl && m.previewCanvas) {
+                    rawDataUrl = m.previewCanvas.toDataURL('image/jpeg', 0.85);
+                }
+                return rawDataUrl ? embedXmpInJpeg(rawDataUrl, m.metadata) : null;
+            }
 
-                if (!base64) {
-                    errorCount++;
+            for (let i = 0; i < total; i++) {
+                const m = jobMeta[i];
+                const { fileName, metadata } = m;
+                const avanzar = () => {
                     const pct = Math.round(((i + 1) / total) * 100);
                     bar.style.width = `${pct}%`;
                     countEl.textContent = `${i + 1} / ${total}`;
-                    continue;
-                }
+                };
 
                 if (uploadedFileNames.has(fileName)) {
                     skippedCount++;
                     successCount++;
                     statusEl.textContent = `Omitida (ya subida): ${fileName.substring(0, 45)}...`;
-                    const pct = Math.round(((i + 1) / total) * 100);
-                    bar.style.width = `${pct}%`;
-                    countEl.textContent = `${i + 1} / ${total}`;
+                    avanzar();
+                    continue;
+                }
+
+                statusEl.textContent = `Procesando: ${fileName.substring(0, 55)}...`;
+                const base64 = await generarBase64(m);
+                if (!base64) {
+                    errorCount++;
+                    avanzar();
                     continue;
                 }
 
@@ -2878,9 +2936,9 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 } catch (e) {
                     errorCount++;
                 }
-                const pct = Math.round(((i + 1) / total) * 100);
-                bar.style.width = `${pct}%`;
-                countEl.textContent = `${i + 1} / ${total}`;
+                avanzar();
+                // Ceder el hilo entre fotos para no congelar la interfaz
+                await new Promise(r => setTimeout(r, 0));
             }
 
             const nuevasSubidas = successCount - skippedCount;
