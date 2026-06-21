@@ -305,6 +305,15 @@
             text-align: center;
             padding: 1rem 0;
         }
+
+        /* ── Plegar / desplegar cajones de clasificación ── */
+        .clasif-bucket .bucket-toggle {
+            background: none; border: none; padding: 0; cursor: pointer;
+            display: flex; align-items: center; gap: .5rem; min-width: 0; text-align: left;
+        }
+        .clasif-bucket .bucket-chevron { transition: transform .18s ease; }
+        .clasif-bucket.colapsado .bucket-chevron { transform: rotate(-90deg); }
+        .clasif-bucket.colapsado .bucket-photos { display: none; }
     </style>
 </head>
 
@@ -2499,6 +2508,17 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             return `${fecha}_${titulo} (${meta})_${index + 1}.jpg`;
         }
 
+        // Correlativo de subida POR clasificación (sobrevive a varias subidas y
+        // limpiezas dentro de la sesión). Evita que, al vaciar un cajón y volver
+        // a llenarlo, las fotos nuevas reciban un número ya usado y se omitan.
+        const uploadSeqByKey = {};
+        function claveSecuencia(c) {
+            const fecha = getFormattedDateForFilename();
+            const titulo = (c.titulo || '').trim().substring(0, 50);
+            const meta = [c.tema, ...(c.opts || [])].join('-');
+            return `${fecha}_${titulo} (${meta})`;
+        }
+
         // ── Persistencia de cajones en localStorage (por proyecto) ─────────
         function clasifStorageKey() {
             return 'clasifBuckets_' + (proyectoInput.value || PROYECTO_PARAM || 'default');
@@ -2518,7 +2538,8 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                     especialidad: b.especialidad || '',
                     tema: b.tema || '',
                     opts: Array.isArray(b.opts) ? b.opts : [],
-                    titulo: b.titulo || ''
+                    titulo: b.titulo || '',
+                    colapsado: !!b.colapsado
                 }));
                 // Mantener el contador por encima de los ids ya usados
                 clasifBuckets.forEach(b => {
@@ -2762,12 +2783,20 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                     : '';
                 card.innerHTML = `
                     <div class="flex items-start justify-between gap-2 p-3 pb-2">
-                        <div class="min-w-0">
-                            <p class="text-sm font-bold text-gray-800 truncate">${label}</p>
-                            ${tituloLinea}
-                        </div>
+                        <button class="bucket-toggle" onclick="toggleBucketColapsado('${b.id}')" title="Plegar / desplegar este cajón">
+                            <svg class="bucket-chevron w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            <div class="min-w-0">
+                                <p class="text-sm font-bold text-gray-800 truncate">${label}</p>
+                                ${tituloLinea}
+                            </div>
+                        </button>
                         <div class="flex items-center gap-1.5 shrink-0">
                             <span class="bucket-count text-xs font-bold text-blue-600 bg-blue-50 rounded-full px-2 py-0.5">0</span>
+                            <button title="Subir solo este cajón a Drive (las fotos subidas se irán quitando)"
+                                class="text-gray-400 hover:text-green-600 p-1"
+                                onclick="subirCajon('${b.id}')">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                            </button>
                             <button title="Actualizar este cajón con la actividad del panel"
                                 class="text-gray-400 hover:text-blue-600 p-1"
                                 onclick="actualizarBucketDesdePanel('${b.id}')">
@@ -2787,6 +2816,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                     </div>
                     <div class="bucket-photos" data-empty="Arrastra aquí las fotos (en móvil, mantén pulsada la foto)"></div>`;
                 cont.appendChild(card);
+                if (b.colapsado) card.classList.add('colapsado');
 
                 const zona = card.querySelector('.bucket-photos');
                 attachDropZone(zona);
@@ -2794,6 +2824,16 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 // Restaurar las tarjetas que ya estaban en este cajón
                 (previas[b.id] || []).forEach(w => { zona.appendChild(w); redrawWrapper(w); });
             });
+        }
+
+        // ── Plegar / desplegar un cajón ────────────────────────────────────
+        function toggleBucketColapsado(id) {
+            const b = clasifBuckets.find(x => x.id === id);
+            if (!b) return;
+            b.colapsado = !b.colapsado;
+            guardarBucketsLS();
+            const el = document.querySelector(`.clasif-bucket[data-bid="${id}"]`);
+            if (el) el.classList.toggle('colapsado', !!b.colapsado);
         }
 
         // ── Contadores (sin clasificar + por cajón) ────────────────────────
@@ -2810,6 +2850,39 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             });
         }
 
+        // ── ¿Dos clasificaciones son equivalentes? (para no duplicar cajones) ─
+        function mismaClasif(a, b) {
+            const optsA = JSON.stringify((a.opts || []).filter(Boolean));
+            const optsB = JSON.stringify((b.opts || []).filter(Boolean));
+            return (a.especialidad || '') === (b.especialidad || '') &&
+                   (a.tema || '') === (b.tema || '') &&
+                   (a.titulo || '') === (b.titulo || '') &&
+                   optsA === optsB;
+        }
+
+        // Crea una clasificación a partir de la selección del panel y mueve
+        // allí la foto cuyo menú está abierto (creación ágil desde el menú).
+        function crearClasifDesdePanelYMover() {
+            const c = snapshotSidebarClasif();
+            if (!c.tema) {
+                alert('Primero selecciona una actividad (especialidad y tema) en el panel izquierdo.');
+                return;
+            }
+            const bucket = {
+                id: 'bucket_' + (++_bucketSeq),
+                especialidad: c.especialidad,
+                tema: c.tema,
+                opts: c.opts,
+                titulo: c.titulo,
+                colapsado: false
+            };
+            clasifBuckets.push(bucket);
+            guardarBucketsLS();
+            renderBuckets();
+            actualizarContadores();
+            moverFotoAClasif(bucket.id); // cierra el menú y traslada la foto
+        }
+
         // ── Menú para asignar la clasificación de una foto con un toque ─────
         function abrirMenuClasifFoto(wrapper) {
             _menuFotoWrapper = wrapper;
@@ -2818,6 +2891,26 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
 
             const bucketActual = wrapper.closest('.clasif-bucket');
             const bidActual = bucketActual ? bucketActual.dataset.bid : null;
+
+            // Opción ágil: crear una nueva clasificación con lo seleccionado en
+            // los menús desplegables del panel y mover la foto allí. Solo se
+            // muestra si hay actividad seleccionada y no coincide con un cajón existente.
+            const sc = snapshotSidebarClasif();
+            if (sc.tema && !clasifBuckets.some(b => mismaClasif(b, sc))) {
+                const btn = document.createElement('button');
+                btn.className = 'w-full text-left px-3 py-2.5 rounded-lg border border-green-400 bg-green-50 hover:bg-green-100 transition-all';
+                btn.onclick = crearClasifDesdePanelYMover;
+                const sub = sc.titulo ? sc.titulo : 'Crear con la selección actual del panel';
+                btn.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-green-800 truncate">Crear: ${clasifLabel(sc)}</p>
+                            <p class="text-xs text-green-600 italic truncate">${sub}</p>
+                        </div>
+                    </div>`;
+                lista.appendChild(btn);
+            }
 
             // Opción: Sin clasificar
             lista.appendChild(crearOpcionMenu('Sin clasificar', '', bidActual === null, () => moverFotoAClasif(null)));
@@ -2873,8 +2966,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
             }
             if (zona && zona !== wrapper.parentElement) {
                 moverWrapperAZona(wrapper, zona);
-                const dest = document.querySelector(`.clasif-bucket[data-bid="${bid}"]`);
-                if (dest) dest.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                // No desplazamos la vista: mantener al usuario donde estaba para no desubicarlo.
             }
         }
 
@@ -3042,19 +3134,22 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
         attachDropZone(previewArea);
 
         // ── Subir una lista de tarjetas con UNA clasificación dada ─────────
-        async function subirLista(wrappers, clasif, jobTitulo, jobFecha, addToCatalog) {
+        async function subirLista(wrappers, clasif, jobTitulo, jobFecha, addToCatalog, eliminarTrasSubir = false) {
             if (!wrappers || !wrappers.length) return;
             const total = wrappers.length;
             const jobId = 'job_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
             // Solo metadatos ligeros por adelantado (sin canvas ni base64).
-            const jobMeta = wrappers.map((wrapper, i) => {
+            // El nombre se asigna dentro del bucle, con un correlativo persistente.
+            const claveSeq = claveSecuencia(clasif);
+            const jobMeta = wrappers.map((wrapper) => {
                 const item = wrapper._photo || {};
                 const hora = item.hora || '';
                 return {
+                    wrapper,
+                    photo: item,
                     file: item.file || null,
                     previewCanvas: wrapper.querySelector('canvas'),
-                    fileName: fileNameFromClasif(clasif, i),
                     metadata: metaFromClasif(clasif, hora)
                 };
             });
@@ -3089,20 +3184,30 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
 
             for (let i = 0; i < total; i++) {
                 const m = jobMeta[i];
-                const { fileName, metadata } = m;
+                const { metadata } = m;
                 const avanzar = () => {
                     const pct = Math.round(((i + 1) / total) * 100);
                     bar.style.width = `${pct}%`;
                     countEl.textContent = `${i + 1} / ${total}`;
                 };
 
-                if (uploadedFileNames.has(fileName)) {
+                // Verificación por IDENTIDAD de la foto y POR clasificación:
+                // si esta foto concreta ya se subió bajo ESTA misma clasificación,
+                // se omite; pero si se agregaron fotos nuevas o se reclasificó a
+                // otro cajón, sí se sube (no depende de la posición/nombre).
+                if (m.photo && m.photo._subidaKey === claveSeq) {
                     skippedCount++;
                     successCount++;
-                    statusEl.textContent = `Omitida (ya subida): ${fileName.substring(0, 45)}...`;
+                    const yaNombre = m.photo._nombreSubida || '';
+                    statusEl.textContent = `Omitida (ya subida): ${yaNombre.substring(0, 45)}...`;
+                    if (eliminarTrasSubir) deletePhoto(m.wrapper);
                     avanzar();
                     continue;
                 }
+
+                // Nombre único y correlativo por clasificación; nunca se reutiliza.
+                const seq = (uploadSeqByKey[claveSeq] = (uploadSeqByKey[claveSeq] || 0) + 1);
+                const fileName = fileNameFromClasif(clasif, seq - 1);
 
                 statusEl.textContent = `Procesando: ${fileName.substring(0, 55)}...`;
                 const base64 = await generarBase64(m);
@@ -3120,7 +3225,9 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                         body: JSON.stringify({ base64, type: 'image/jpeg', name: fileName, metadata })
                     });
                     uploadedFileNames.add(fileName);
+                    if (m.photo) { m.photo._subidaKey = claveSeq; m.photo._nombreSubida = fileName; }
                     successCount++;
+                    if (eliminarTrasSubir) deletePhoto(m.wrapper);
                 } catch (e) {
                     errorCount++;
                 }
@@ -3157,6 +3264,23 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                     if (!container.children.length) container.classList.add('hidden');
                 }, 500);
             }, 7000);
+        }
+
+        // ── Subir SOLO un cajón ────────────────────────────────────────────
+        // Sube las fotos de un único cajón y las va quitando a medida que se
+        // confirman en Drive, para ir limpiando lo ya clasificado.
+        async function subirCajon(id) {
+            const el = document.querySelector(`.clasif-bucket[data-bid="${id}"]`);
+            if (!el) return;
+            const ws = Array.from(el.querySelectorAll('.canvas-wrapper'));
+            if (!ws.length) {
+                alert('Este cajón no tiene fotos para subir.');
+                return;
+            }
+            const b = clasifBuckets.find(x => x.id === id);
+            if (!b) return;
+            const jobFecha = fechaInput.value;
+            await subirLista(ws, b, b.titulo || clasifLabel(b), jobFecha, false, true);
         }
 
         // ── Despachador de subida ──────────────────────────────────────────
