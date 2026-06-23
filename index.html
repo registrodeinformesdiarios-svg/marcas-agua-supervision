@@ -635,6 +635,17 @@
                         A Drive se sube la foto <strong>original sin marca</strong>; la marca se aplica
                         dinámicamente en la galería según los metadatos y puede cambiarse luego.
                     </p>
+
+                    <!-- Subir al "buffer" de pendientes de clasificar (clasificación posterior en la galería) -->
+                    <button id="uploadPendientesBtn" onclick="subirParaClasificar()"
+                        class="w-full bg-amber-500 text-white font-bold py-3 rounded-lg opacity-50 cursor-not-allowed transition-all flex items-center justify-center gap-2" disabled>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Para clasificar en galería
+                    </button>
+                    <p class="text-[11px] text-center text-gray-400 leading-snug px-1">
+                        Sube las fotos al <strong>buffer "Pendientes de clasificar"</strong> sin elegir actividad.
+                        Luego se clasifican cómodamente desde la computadora en la galería.
+                    </p>
                     <p id="driveNuevoTituloHint" class="hidden text-xs text-center text-red-600 font-medium mt-1 leading-snug px-1"></p>
 
                 </div>
@@ -1365,6 +1376,8 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 downloadBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                 uploadDriveBtn.disabled = false;
                 uploadDriveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                const upPend = document.getElementById('uploadPendientesBtn');
+                if (upPend) { upPend.disabled = false; upPend.classList.remove('opacity-50', 'cursor-not-allowed'); }
                 document.getElementById('addMoreBtn').classList.remove('hidden');
                 setTimeout(() => { progressContainer.classList.add('hidden'); }, 2000);
             })();
@@ -1406,6 +1419,8 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 downloadBtn.classList.add('opacity-50', 'cursor-not-allowed');
                 uploadDriveBtn.disabled = true;
                 uploadDriveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                const upPend = document.getElementById('uploadPendientesBtn');
+                if (upPend) { upPend.disabled = true; upPend.classList.add('opacity-50', 'cursor-not-allowed'); }
                 document.getElementById('addMoreBtn').classList.add('hidden');
                 previewArea.innerHTML = '<div class="col-span-full text-center py-20 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">Cargue imágenes para visualizar la marca de agua.</div>';
             }
@@ -1508,6 +1523,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
 `<psm:clasificacion>${_xmlEscape(meta.clasificacion)}</psm:clasificacion>` +
 `<psm:marca>${_xmlEscape(meta.marca)}</psm:marca>` +
 `<psm:original>${_xmlEscape(meta.original)}</psm:original>` +
+(meta.pendiente ? `<psm:pendiente>${_xmlEscape(meta.pendiente)}</psm:pendiente>` : '') +
 `</rdf:Description></rdf:RDF></x:xmpmeta>` +
 `<?xpacket end="w"?>`;
         }
@@ -2484,6 +2500,23 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
 
         // Metadatos para Drive a partir de una clasificación concreta (no del panel).
         function metaFromClasif(c, hora) {
+            // ── Caso especial: foto enviada al buffer "Pendientes de clasificar" ──
+            // Sin tema ni actividad; se clasificará luego desde la galería.
+            if (c && c.pendiente) {
+                return {
+                    proyecto: proyectoInput.value || '',
+                    fecha: fechaInput.value || '',
+                    hora: hora || '',
+                    marca: 'no',            // todavía no se aplica marca (falta clasificar)
+                    original: 'si',
+                    pendiente: 'si',        // ← bandera de "pendiente de clasificar"
+                    titulo: '',
+                    tema: '',
+                    especialidad: '',
+                    clasificacion: 'Pendiente de clasificar',
+                    etiquetas: []
+                };
+            }
             const opts = (c.opts || []).filter(Boolean);
             const espEl = document.getElementById('especialidadSelect');
             return {
@@ -2503,6 +2536,10 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
         // Nombre de archivo para una clasificación concreta.
         function fileNameFromClasif(c, index) {
             const fecha = getFormattedDateForFilename();
+            // Buffer de pendientes: nombre reconocible, sin paréntesis de clasificación.
+            if (c && c.pendiente) {
+                return `${fecha}_PENDIENTE DE CLASIFICAR_${index + 1}.jpg`;
+            }
             const titulo = (c.titulo || '').trim().substring(0, 50);
             const meta = [c.tema, ...(c.opts || [])].join('-');
             return `${fecha}_${titulo} (${meta})_${index + 1}.jpg`;
@@ -2514,6 +2551,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
         const uploadSeqByKey = {};
         function claveSecuencia(c) {
             const fecha = getFormattedDateForFilename();
+            if (c && c.pendiente) return `${fecha}_PENDIENTE DE CLASIFICAR`;
             const titulo = (c.titulo || '').trim().substring(0, 50);
             const meta = [c.tema, ...(c.opts || [])].join('-');
             return `${fecha}_${titulo} (${meta})`;
@@ -3331,6 +3369,24 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                 const sc = snapshotSidebarClasif();
                 await subirLista(allWrappers, sc, sc.titulo || 'Sin título', jobFecha, true);
             }
+        }
+
+        // ── Subir al buffer "Pendientes de clasificar" ─────────────────────
+        // Sube TODAS las fotos cargadas sin elegir actividad. Quedan marcadas
+        // como "pendiente de clasificar" (en el nombre y en los metadatos) para
+        // clasificarlas luego cómodamente desde la galería en la computadora.
+        async function subirParaClasificar() {
+            const allWrappers = Array.from(document.querySelectorAll('.canvas-wrapper'));
+            if (!allWrappers.length) {
+                alert('Primero carga las fotos que quieres enviar al buffer de pendientes.');
+                return;
+            }
+            if (!confirm(`¿Subir ${allWrappers.length} foto${allWrappers.length !== 1 ? 's' : ''} al buffer "Pendientes de clasificar"?\n\nSe subirán sin actividad y se clasificarán después desde la galería.`)) {
+                return;
+            }
+            const jobFecha = fechaInput.value;
+            // clasif marcada como pendiente → metaFromClasif/fileNameFromClasif lo manejan
+            await subirLista(allWrappers, { pendiente: true }, 'Pendientes de clasificar', jobFecha, false, true);
         }
         // ── Drag & Drop de fotos ──────────────────────────────────────────
         (function() {
