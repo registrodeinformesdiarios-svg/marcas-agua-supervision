@@ -525,7 +525,8 @@
                     <div class="space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Proyecto</label>
-                            <input type="text" id="proyectoInput" value="PS Tecales"
+                            <input type="text" id="proyectoInput" value=""
+                                placeholder="Escribe el proyecto (ej. PS Colorado)"
                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                                 oninput="updateAllCanvas()">
                         </div>
@@ -816,6 +817,27 @@
         // ── Leer parámetro ?proyecto= de la URL ───────────────────────────
         const URL_PARAMS    = new URLSearchParams(window.location.search);
         const PROYECTO_PARAM = URL_PARAMS.get("proyecto") || "";
+
+        // ── Resolver a qué proyecto se sube ────────────────────────────────
+        // Prioridad: ?proyecto= en la URL > campo de texto "Proyecto".
+        // Si no hay ninguno, se pregunta con un prompt y se recuerda en el
+        // campo para no volver a preguntar en la misma sesión. El nombre debe
+        // coincidir con una clave del mapa CARPETAS del App Script.
+        function asegurarProyecto() {
+            let p = (PROYECTO_PARAM || (proyectoInput.value || '')).trim();
+            if (!p) {
+                p = (prompt(
+                    '¿A qué proyecto quieres subir las fotos?\n\n' +
+                    'Escribe el nombre tal como está configurado en el App Script\n' +
+                    '(por ejemplo: PS Colorado, PS Los Tecales, Inolasa).'
+                ) || '').trim();
+                if (p) {
+                    proyectoInput.value = p;
+                    updateAllCanvas();   // refresca la marca de agua con el nuevo proyecto
+                }
+            }
+            return p;
+        }
 
         const previewArea = document.getElementById('previewArea');
         const proyectoInput = document.getElementById('proyectoInput');
@@ -3174,6 +3196,16 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
         // ── Subir una lista de tarjetas con UNA clasificación dada ─────────
         async function subirLista(wrappers, clasif, jobTitulo, jobFecha, addToCatalog, eliminarTrasSubir = false) {
             if (!wrappers || !wrappers.length) return;
+
+            // Proyecto destino (se envía al App Script para elegir la carpeta).
+            // Debe resolverse ANTES de construir los metadatos, porque
+            // metaFromClasif lee proyectoInput.value.
+            const proyecto = asegurarProyecto();
+            if (!proyecto) {
+                alert('Debes indicar el proyecto antes de subir las fotos.');
+                return;
+            }
+
             const total = wrappers.length;
             const jobId = 'job_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
@@ -3260,7 +3292,7 @@ Esto sobreescribirá los archivos actuales del proyecto.`)) return;
                     await fetch(SCRIPT_URL, {
                         method: 'POST',
                         mode: 'no-cors',
-                        body: JSON.stringify({ base64, type: 'image/jpeg', name: fileName, metadata })
+                        body: JSON.stringify({ base64, type: 'image/jpeg', name: fileName, metadata, proyecto })
                     });
                     uploadedFileNames.add(fileName);
                     if (m.photo) { m.photo._subidaKey = claveSeq; m.photo._nombreSubida = fileName; }
